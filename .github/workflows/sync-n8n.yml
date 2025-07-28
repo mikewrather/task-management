@@ -1,0 +1,33 @@
+name: Sync n8n Workflows
+
+on:
+  push:
+    paths:
+      - 'n8n-*.json'
+      - '.github/workflows/sync-n8n.yml'
+  workflow_dispatch:
+
+jobs:
+  sync-workflows:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup n8n CLI
+      run: |
+        npm install -g n8n
+    
+    - name: Import Workflows to n8n
+      env:
+        N8N_HOST: ${{ secrets.N8N_HOST }}
+        N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+      run: |
+        # If using n8n cloud or self-hosted with API
+        for workflow in n8n-*.json; do
+          echo "Importing $workflow..."
+          curl -X POST "$N8N_HOST/api/v1/workflows" \
+            -H "X-N8N-API-KEY: $N8N_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d @"$workflow"
+        done
