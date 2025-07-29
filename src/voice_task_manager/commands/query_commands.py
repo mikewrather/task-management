@@ -675,3 +675,100 @@ def _build_area_filter(filters: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         return {"and": filter_conditions}
     
     return None
+
+
+@query.command()
+@click.argument('task_id', required=True)
+@click.option('--confirm', is_flag=True, help='Confirm deletion without interactive prompt')
+@click.option('--dry-run', is_flag=True, help='Show what would be deleted without actually doing it')
+@click.option('--verbose', '-v', is_flag=True, help='Show detailed output')
+@click.pass_context
+def delete_task(ctx, task_id, confirm, dry_run, verbose):
+    """
+    Delete (archive) a task from Notion Tasks database
+    
+    Examples:
+      vtm list delete-task abc123-def456-ghi789 --confirm
+      vtm list delete-task abc123-def456-ghi789 --dry-run
+    """
+    try:
+        # Load environment variables
+        _load_environment()
+        
+        # Initialize components
+        logger = VoiceLogger()
+        notion_client = NotionClient(logger=logger)
+        
+        if verbose:
+            console.print(f"🔍 Processing delete request for task: {task_id}", style="dim")
+        
+        if dry_run:
+            console.print("🧪 [yellow]DRY RUN MODE[/yellow] - No actual deletion will be performed")
+            
+            # Try to fetch the task to show what would be deleted
+            try:
+                task = notion_client.get_task(task_id)
+                if task:
+                    console.print(f"\n📋 Task to be deleted:")
+                    console.print(f"   ID: {task.task_id}")
+                    console.print(f"   Title: {task.title}")
+                    console.print(f"   Status: {task.status}")
+                    console.print(f"   Created: {task.created_at}")
+                    console.print(f"\n✅ Task exists and would be archived (not permanently deleted)")
+                else:
+                    console.print(f"❌ Task with ID {task_id} not found")
+                    sys.exit(1)
+            except Exception as e:
+                console.print(f"❌ Error fetching task: {str(e)}", style="red")
+                sys.exit(1)
+                
+            return
+        
+        # Interactive confirmation if not provided
+        if not confirm:
+            # Try to fetch task details for confirmation
+            try:
+                task = notion_client.get_task(task_id)
+                if task:
+                    console.print(f"\n📋 Task to delete:")
+                    console.print(f"   Title: {task.title}")
+                    console.print(f"   Status: {task.status}")
+                    console.print(f"   Created: {task.created_at}")
+                else:
+                    console.print(f"❌ Task with ID {task_id} not found")
+                    sys.exit(1)
+            except Exception as e:
+                console.print(f"⚠️  Could not fetch task details: {str(e)}")
+                console.print(f"   Proceeding with deletion of task ID: {task_id}")
+            
+            # Ask for confirmation
+            if not click.confirm("\n⚠️  Are you sure you want to delete this task? (This will archive it in Notion)"):
+                console.print("❌ Deletion cancelled")
+                return
+        
+        # Perform the deletion
+        if verbose:
+            console.print("🗑️  Deleting task...", style="dim")
+        
+        start_time = datetime.now()
+        success = notion_client.delete_task(task_id)
+        operation_time = (datetime.now() - start_time).total_seconds() * 1000
+        
+        if success:
+            console.print(f"✅ Task {task_id} successfully deleted (archived)", style="green")
+            if verbose:
+                console.print(f"🕒 Operation completed in {operation_time:.2f}ms", style="dim")
+        else:
+            console.print(f"❌ Failed to delete task {task_id}", style="red")
+            console.print("   Possible reasons:")
+            console.print("   • Task ID does not exist")
+            console.print("   • Task is already archived")
+            console.print("   • Insufficient permissions")
+            console.print("   • Network or API error")
+            sys.exit(1)
+        
+    except Exception as e:
+        console.print(f"❌ Error executing delete: {str(e)}", style="red")
+        if verbose:
+            console.print_exception()
+        sys.exit(1)

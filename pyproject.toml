@@ -30,6 +30,12 @@ dev = [
     "mypy",
     "pytest-mock"
 ]
+mcp = [
+    "mcp[cli]>=1.12.0"
+]
+all = [
+    "voice-task-manager[dev,mcp]"
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

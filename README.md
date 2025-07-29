@@ -5,7 +5,10 @@ A professional Python package that automatically converts voice recordings into 
 ## 🚀 Quick Start
 
 ```bash
-# Install the package
+# Install with uv (recommended - faster and more reliable)
+uv pip install voice-task-manager
+
+# Or install with pip (legacy)
 pip install voice-task-manager
 
 # Set up configuration
@@ -93,6 +96,21 @@ Python Processing Pipeline
 
 Pure Python automation that runs reliably via cron with comprehensive error handling, duplicate prevention, and file cleanup management. No complex orchestration needed - just works.
 
+## 🎛️ MCP Inspector Dashboard
+
+Interactive visual testing tool for the enhanced MCP server with 9 tools:
+
+```bash
+# Start MCP Inspector dashboard
+mcp dev notion_mcp_server.py
+# Opens at: http://localhost:6274
+
+# Or use our demo script
+./scripts/demo-mcp-inspector.sh
+```
+
+**Features:** Test all 9 MCP tools (Tasks, Projects, Areas, Goals, Notes, Events, References, Delete Task, Server Info) with real-time parameter testing and response visualization.
+
 ## 📁 Project Structure
 
 ```
@@ -135,10 +153,28 @@ task-management/
    ```
 
 3. **Set up Python environment**
+   
+   **Using uv (recommended):**
+   ```bash
+   # Install uv (if not already installed)
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # Run automated migration
+   ./scripts/migrate-to-uv.sh
+   
+   # OR manual setup:
+   uv venv
+   source .venv/bin/activate
+   uv pip install -e ".[dev,mcp]"
+   ```
+   
+   **Using pip (legacy):**
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt
+   pip install -r mcp-requirements.txt
    ```
 
 4. **Test the system**

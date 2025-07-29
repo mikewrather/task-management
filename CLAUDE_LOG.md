@@ -1,5 +1,132 @@
 # Claude Code Session Log
 
+## Session: 2025-07-28 - Enhanced MCP Server & CLI Delete Command Implementation
+
+### MCP Server Enhancement & Inspector Dashboard Setup - COMPLETED
+
+**Context**: Extended the Voice Task Manager MCP server from 4 to 9 tools with comprehensive CRUD operations and set up MCP Inspector dashboard for interactive testing and development.
+
+**Major Achievements**:
+
+#### ✅ Enhanced MCP Server (4 → 9 Tools)
+- **Added New Entity Support**: Goals, Notes, Events, References list tools
+- **Added CRUD Operations**: `delete_task` tool with confirmation safety
+- **Updated Server Info**: Enhanced `server_info` tool with detailed capabilities
+- **uv Compatibility**: Updated shebang to use `.venv/bin/python` for uv environment
+- **Performance**: All tools include query execution time monitoring
+
+**New MCP Tools Added**:
+- `list_goals` - Query goals with progress tracking and area relationships
+- `list_notes` - Query notes with content, tags, and relationship information  
+- `list_events` - Query events/meetings with timing and project relationships
+- `list_references` - Query references with ratings, categories, and relationships
+- `delete_task` - Delete (archive) tasks with confirmation safety
+
+#### ✅ MCP Inspector Dashboard Setup
+- **Installation**: Set up official MCP Inspector for visual testing
+- **Multiple Access Methods**: 
+  - `mcp dev notion_mcp_server.py` (recommended)
+  - `npx @modelcontextprotocol/inspector` (direct)
+  - Custom scripts in `scripts/` directory
+- **Dashboard Features**: 
+  - Interactive tool testing at http://localhost:6274
+  - Real-time parameter testing and response visualization
+  - Export configurations for Claude Desktop, Cursor, etc.
+- **Documentation**: Comprehensive setup guides and testing workflows
+
+#### ✅ Comprehensive Documentation
+- **Created**: `docs/mcp-inspector-setup.md` - Complete setup and usage guide
+- **Created**: `docs/mcp-server-guide.md` - Enhanced server documentation
+- **Updated**: README.md with MCP Inspector dashboard section
+- **Created**: `scripts/start-mcp-inspector.sh` - Automated startup script
+- **Created**: `scripts/demo-mcp-inspector.sh` - Interactive demo script
+- **Created**: `scripts/test-mcp-server.py` - Server validation script
+
+### CLI Delete Command Implementation - COMPLETED
+
+**Context**: Implemented production-ready CLI delete command for tasks with safety features and used it to successfully clean up duplicate voice note tasks.
+
+**Major Achievements**:
+
+#### ✅ CLI Delete Command (`vtm list delete-task`)
+- **Command**: `vtm list delete-task <task_id>`
+- **Safety Features**:
+  - `--dry-run` flag for preview without deletion
+  - `--confirm` flag for non-interactive operation
+  - Interactive confirmation with task details display
+  - Archives tasks (doesn't permanently delete)
+- **Integration**: Seamlessly integrated with existing CLI using Click framework
+- **Error Handling**: Comprehensive error messages and suggestions
+
+#### ✅ Duplicate Task Cleanup Success
+- **Problem**: 100+ duplicate voice note tasks in Notion database
+- **Solution**: Systematic cleanup using new CLI delete command
+- **Results**: Successfully deleted 4 duplicate tasks in test run
+- **Method**: Created `scripts/clean-duplicates-cli.sh` for batch operations
+- **Verification**: Confirmed proper archival in Notion (not permanent deletion)
+
+#### ✅ Enhanced CLI Integration
+- **Extended**: `src/voice_task_manager/commands/query_commands.py` with delete command
+- **Integration**: Used existing NotionClient `delete_task()` and `get_task()` methods
+- **Output**: Rich console formatting with colors, timing, and detailed feedback
+- **Testing**: Comprehensive testing with both dry-run and actual deletion modes
+
+**Technical Implementation Details**:
+
+#### MCP Server Files Created/Modified:
+- `notion_mcp_server.py` - Enhanced from 4 to 9 tools
+- `docs/mcp-inspector-setup.md` - Complete setup guide (274 lines)
+- `docs/mcp-server-guide.md` - Enhanced server documentation (312 lines)
+- `scripts/start-mcp-inspector.sh` - Automated startup (53 lines)
+- `scripts/demo-mcp-inspector.sh` - Interactive demo (64 lines)
+- `scripts/test-mcp-server.py` - Server validation (100+ lines)
+
+#### CLI Delete Command Files:
+- `src/voice_task_manager/commands/query_commands.py` - Added delete_task command (95 lines)
+- `scripts/clean-duplicates-cli.sh` - Batch cleanup script (50 lines)
+
+**System Performance & Benefits**:
+
+#### MCP Server Benefits:
+- **Developer Experience**: Visual testing replaces command-line debugging
+- **Client Integration**: Easy export of configurations for production clients
+- **Real-time Testing**: Interactive parameter testing with immediate feedback
+- **Comprehensive Coverage**: All 7 entity types now supported via MCP
+
+#### CLI Delete Benefits:
+- **Safety**: Multiple confirmation layers prevent accidental deletions
+- **Efficiency**: Batch operations possible while maintaining individual confirmation
+- **Integration**: Leverages existing NotionClient infrastructure
+- **User Experience**: Rich console output with clear success/failure indicators
+
+**Current System Status**:
+- ✅ **MCP Server Enhanced**: 9 tools available with comprehensive entity coverage
+- ✅ **MCP Inspector Ready**: Interactive dashboard for development and testing
+- ✅ **CLI Delete Functional**: Production-ready task deletion with safety features
+- ✅ **Duplicate Cleanup Started**: Successfully removed sample duplicate tasks
+- ✅ **Documentation Complete**: Comprehensive guides for both MCP and CLI features
+
+**Usage Examples**:
+```bash
+# MCP Inspector Dashboard
+mcp dev notion_mcp_server.py
+# Opens at: http://localhost:6274
+
+# CLI Delete Command
+vtm list delete-task abc123-def456 --dry-run    # Preview
+vtm list delete-task abc123-def456 --confirm    # Delete
+```
+
+**Next Steps Available**:
+1. Complete duplicate task cleanup using established CLI workflow
+2. Add CLI commands for remaining entities (Goals, Notes, Events, References)  
+3. Implement additional MCP CRUD operations (create, update) for all entities
+4. Extend MCP Inspector usage for production client configuration
+
+The Voice Task Manager system now provides both interactive visual testing through MCP Inspector and production-ready CLI task management with comprehensive CRUD operations support.
+
+---
+
 ## Session: 2025-07-25 - Notion Chat Feature Phase 1 Implementation
 
 ### Phase 1: Basic Query Infrastructure - COMPLETED
@@ -426,3 +553,55 @@ The system has been transformed from a functional prototype with organizational 
 **Next Steps**: Use this schema analysis to update any planning documents, voice command references, or API integration code with the actual valid values and database structure discovered through this inspection.
 
 The task management project now has a clean, well-organized structure with comprehensive documentation that accurately reflects its current capabilities and future roadmap.
+
+---
+
+## 2025-07-29 - Multi-Platform Voice Processing Enhancement
+
+**Objective**: Implement intelligent voice task categorization with multi-platform support (Notion + GraphRAG).
+
+**Activities Completed**:
+
+1. **GraphRAG Database Cleanup**:
+   - Removed test entities (TEST_ENTITY, AGENT, AUDIO_CLIP)
+   - Established missing task relationships
+   - Current state: 23 tasks, 12 projects, 9 areas, 1 goal
+
+2. **Adapter Pattern Implementation**:
+   - Created abstract `TaskAdapter` interface
+   - Implemented `NotionTaskAdapter` (refactored from existing)
+   - Implemented `GraphRAGTaskAdapter` (new, with MCP integration)
+   - Supports dual-write mode for gradual migration
+
+3. **Claude-Based Intelligent Processing**:
+   - Built `ClaudeVoiceProcessor` using `claude -p` approach
+   - Retrieves context from GraphRAG for categorization
+   - Analyzes transcripts to assign proper project/area/goal
+   - Uses existing relationships and patterns for consistency
+
+4. **Enhanced Voice Processor V2**:
+   - Multi-adapter support (write to both Notion and GraphRAG)
+   - Configurable via environment variables
+   - Backward compatible with existing CLI
+   - Health checks for all adapters
+
+**Key Features**:
+
+- **Context-Aware Categorization**: Uses GraphRAG knowledge graph to intelligently categorize tasks
+- **Migration Support**: Can write to both systems during transition period
+- **Configuration Flexibility**: Enable/disable adapters via .env settings
+- **Local Claude Execution**: Uses `claude -p` for MCP tool access without API keys
+
+**Configuration Added**:
+```env
+ENABLE_NOTION_ADAPTER=true
+ENABLE_GRAPHRAG_ADAPTER=true
+USE_CLAUDE_PROCESSOR=true
+ADAPTER_MODE=both
+```
+
+**Next Steps**:
+- Test with real voice recordings
+- Fine-tune Claude prompts based on results
+- Complete remaining task relationship mappings
+- Gradually migrate from Notion to GraphRAG as primary storage

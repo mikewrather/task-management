@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/mike/development/task-management/.venv/bin/python
 """
 MCP Server for Voice Task Management Notion CLI Tools
 
@@ -480,6 +480,475 @@ async def list_areas(
         return error_result
 
 # Server health check and info
+# =============================================================================
+# NEW ENTITY TOOLS - Goals, Notes, Events, References
+# =============================================================================
+
+@mcp.tool()
+async def list_goals(
+    status: Optional[str] = None,
+    goal_type: Optional[str] = None,
+    area: Optional[str] = None,
+    priority: Optional[str] = None,
+    format: str = "json",
+    limit: int = DEFAULT_LIMIT,
+    verbose: bool = False,
+    ctx: Optional[Context] = None
+) -> Dict[str, Any]:
+    """
+    Query goals from Notion with comprehensive filtering options.
+    
+    Returns structured goal data with progress tracking, target dates, and area relationships.
+    Supports filtering by status, type, area, and priority.
+    
+    Args:
+        status: Filter by goal status (e.g., 'Active', 'Completed', 'On Hold')
+        goal_type: Filter by goal type ('Personal', 'Professional', 'Learning')
+        area: Filter by area name or ID (e.g., 'Health', 'Career', 'Family')
+        priority: Filter by priority level ('High', 'Medium', 'Low')
+        format: Output format ('json', 'table', 'rich')
+        limit: Maximum number of goals to return (1-100)
+        verbose: Include detailed query information
+        
+    Returns:
+        Structured goal data with metadata including progress and timeline info
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Querying Notion goals with filters: status={status}, type={goal_type}, area={area}")
+        
+        # Validate parameters
+        params = _validate_parameters(
+            status=status, goal_type=goal_type, area=area,
+            priority=priority, format=format, limit=limit, verbose=verbose
+        )
+        
+        # Build CLI command
+        base_cmd = [VTM_COMMAND, "list", "goals"]
+        cmd = _build_cli_command(base_cmd, params)
+        
+        if ctx and params.get('verbose'):
+            await ctx.debug(f"Executing command: {' '.join(cmd)}")
+        
+        # Execute command
+        start_time = datetime.now()
+        result = _execute_cli_command(cmd)
+        execution_time = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Add execution time to metadata if present
+        if isinstance(result, dict) and 'metadata' in result:
+            result['metadata']['query_time_ms'] = round(execution_time, 2)
+        
+        if ctx:
+            await ctx.info(f"Goals query completed in {execution_time:.2f}ms")
+        
+        return result
+        
+    except (ValidationError, CliExecutionError) as e:
+        error_result = {
+            "success": False,
+            "error": {
+                "type": type(e).__name__,
+                "message": str(e),
+                "suggestions": [
+                    "Check goal_type values: 'Personal', 'Professional', 'Learning'",
+                    "Verify status values: 'Active', 'Completed', 'On Hold'",
+                    "Ensure vtm CLI has goals functionality enabled"
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if ctx:
+            await ctx.error(f"Goals query failed: {str(e)}")
+            
+        return error_result
+    
+    except Exception as e:
+        if ctx:
+            await ctx.error(f"Unexpected error in goals query: {str(e)}")
+            
+        return {
+            "success": False,
+            "error": {
+                "type": "UnexpectedError",
+                "message": f"Unexpected error: {str(e)}"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+@mcp.tool()
+async def list_notes(
+    status: Optional[str] = None,
+    note_type: Optional[str] = None,
+    project: Optional[str] = None,
+    area: Optional[str] = None,
+    tags: Optional[str] = None,
+    format: str = "json",
+    limit: int = DEFAULT_LIMIT,
+    verbose: bool = False,
+    ctx: Optional[Context] = None
+) -> Dict[str, Any]:
+    """
+    Query notes from Notion with comprehensive filtering options.
+    
+    Returns structured note data with content, tags, and relationship information.
+    Supports filtering by status, type, project, area, and tags.
+    
+    Args:
+        status: Filter by note status (e.g., 'Draft', 'Published', 'Archived')
+        note_type: Filter by note type ('Meeting', 'Research', 'General', 'Reference')
+        project: Filter by project name or ID
+        area: Filter by area name or ID
+        tags: Filter by tags, comma-separated for multiple
+        format: Output format ('json', 'table', 'rich')
+        limit: Maximum number of notes to return (1-100)
+        verbose: Include detailed query information
+        
+    Returns:
+        Structured note data with metadata including word count and creation info
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Querying Notion notes with filters: status={status}, type={note_type}, project={project}")
+        
+        # Validate parameters
+        params = _validate_parameters(
+            status=status, note_type=note_type, project=project, area=area,
+            tags=tags, format=format, limit=limit, verbose=verbose
+        )
+        
+        # Build CLI command
+        base_cmd = [VTM_COMMAND, "list", "notes"]
+        cmd = _build_cli_command(base_cmd, params)
+        
+        if ctx and params.get('verbose'):
+            await ctx.debug(f"Executing command: {' '.join(cmd)}")
+        
+        # Execute command
+        start_time = datetime.now()
+        result = _execute_cli_command(cmd)
+        execution_time = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Add execution time to metadata if present
+        if isinstance(result, dict) and 'metadata' in result:
+            result['metadata']['query_time_ms'] = round(execution_time, 2)
+        
+        if ctx:
+            await ctx.info(f"Notes query completed in {execution_time:.2f}ms")
+        
+        return result
+        
+    except (ValidationError, CliExecutionError) as e:
+        error_result = {
+            "success": False,
+            "error": {
+                "type": type(e).__name__,
+                "message": str(e),
+                "suggestions": [
+                    "Check note_type values: 'Meeting', 'Research', 'General', 'Reference'",
+                    "Verify status values: 'Draft', 'Published', 'Archived'",
+                    "Use comma-separated tags for multiple tag filters"
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if ctx:
+            await ctx.error(f"Notes query failed: {str(e)}")
+            
+        return error_result
+    
+    except Exception as e:
+        if ctx:
+            await ctx.error(f"Unexpected error in notes query: {str(e)}")
+            
+        return {
+            "success": False,
+            "error": {
+                "type": "UnexpectedError",
+                "message": f"Unexpected error: {str(e)}"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+@mcp.tool()
+async def list_events(
+    status: Optional[str] = None,
+    event_type: Optional[str] = None,
+    date_range: Optional[str] = None,
+    project: Optional[str] = None,
+    priority: Optional[str] = None,
+    format: str = "json",
+    limit: int = DEFAULT_LIMIT,
+    verbose: bool = False,
+    ctx: Optional[Context] = None
+) -> Dict[str, Any]:
+    """
+    Query events/meetings from Notion with comprehensive filtering options.
+    
+    Returns structured event data with timing, attendees, and project relationships.
+    Supports filtering by status, type, date range, project, and priority.
+    
+    Args:
+        status: Filter by event status (e.g., 'Scheduled', 'Completed', 'Cancelled')
+        event_type: Filter by event type ('Meeting', 'Call', 'Workshop', 'Review')
+        date_range: Filter by date range (e.g., 'today', 'this-week', 'next-month')
+        project: Filter by project name or ID
+        priority: Filter by priority level ('High', 'Medium', 'Low')
+        format: Output format ('json', 'table', 'rich')
+        limit: Maximum number of events to return (1-100)
+        verbose: Include detailed query information
+        
+    Returns:
+        Structured event data with metadata including timing and participant info
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Querying Notion events with filters: status={status}, type={event_type}, date_range={date_range}")
+        
+        # Validate parameters
+        params = _validate_parameters(
+            status=status, event_type=event_type, date_range=date_range,
+            project=project, priority=priority, format=format, limit=limit, verbose=verbose
+        )
+        
+        # Build CLI command
+        base_cmd = [VTM_COMMAND, "list", "events"]
+        cmd = _build_cli_command(base_cmd, params)
+        
+        if ctx and params.get('verbose'):
+            await ctx.debug(f"Executing command: {' '.join(cmd)}")
+        
+        # Execute command
+        start_time = datetime.now()
+        result = _execute_cli_command(cmd)
+        execution_time = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Add execution time to metadata if present
+        if isinstance(result, dict) and 'metadata' in result:
+            result['metadata']['query_time_ms'] = round(execution_time, 2)
+        
+        if ctx:
+            await ctx.info(f"Events query completed in {execution_time:.2f}ms")
+        
+        return result
+        
+    except (ValidationError, CliExecutionError) as e:
+        error_result = {
+            "success": False,
+            "error": {
+                "type": type(e).__name__,
+                "message": str(e),
+                "suggestions": [
+                    "Check event_type values: 'Meeting', 'Call', 'Workshop', 'Review'",
+                    "Verify status values: 'Scheduled', 'Completed', 'Cancelled'",
+                    "Use date_range values: 'today', 'this-week', 'next-month'"
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if ctx:
+            await ctx.error(f"Events query failed: {str(e)}")
+            
+        return error_result
+    
+    except Exception as e:
+        if ctx:
+            await ctx.error(f"Unexpected error in events query: {str(e)}")
+            
+        return {
+            "success": False,
+            "error": {
+                "type": "UnexpectedError",
+                "message": f"Unexpected error: {str(e)}"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+@mcp.tool()
+async def list_references(
+    status: Optional[str] = None,
+    reference_type: Optional[str] = None,
+    category: Optional[str] = None,
+    rating: Optional[int] = None,
+    project: Optional[str] = None,
+    area: Optional[str] = None,
+    format: str = "json",
+    limit: int = DEFAULT_LIMIT,
+    verbose: bool = False,
+    ctx: Optional[Context] = None
+) -> Dict[str, Any]:
+    """
+    Query references from Notion with comprehensive filtering options.
+    
+    Returns structured reference data with ratings, categories, and relationship information.
+    Supports filtering by status, type, category, rating, project, and area.
+    
+    Args:
+        status: Filter by reference status (e.g., 'Active', 'Archived', 'To Review')
+        reference_type: Filter by type ('Article', 'Book', 'Video', 'Podcast', 'Tool', 'Website')
+        category: Filter by category (e.g., 'Technical', 'Business', 'Personal Development')
+        rating: Filter by minimum rating (1-5)
+        project: Filter by related project name or ID
+        area: Filter by related area name or ID
+        format: Output format ('json', 'table', 'rich')
+        limit: Maximum number of references to return (1-100)
+        verbose: Include detailed query information
+        
+    Returns:
+        Structured reference data with metadata including ratings and key insights
+    """
+    try:
+        if ctx:
+            await ctx.info(f"Querying Notion references with filters: status={status}, type={reference_type}, rating>={rating}")
+        
+        # Validate parameters
+        params = _validate_parameters(
+            status=status, reference_type=reference_type, category=category,
+            rating=rating, project=project, area=area,
+            format=format, limit=limit, verbose=verbose
+        )
+        
+        # Build CLI command
+        base_cmd = [VTM_COMMAND, "list", "references"]
+        cmd = _build_cli_command(base_cmd, params)
+        
+        if ctx and params.get('verbose'):
+            await ctx.debug(f"Executing command: {' '.join(cmd)}")
+        
+        # Execute command
+        start_time = datetime.now()
+        result = _execute_cli_command(cmd)
+        execution_time = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Add execution time to metadata if present
+        if isinstance(result, dict) and 'metadata' in result:
+            result['metadata']['query_time_ms'] = round(execution_time, 2)
+        
+        if ctx:
+            await ctx.info(f"References query completed in {execution_time:.2f}ms")
+        
+        return result
+        
+    except (ValidationError, CliExecutionError) as e:
+        error_result = {
+            "success": False,
+            "error": {
+                "type": type(e).__name__,
+                "message": str(e),
+                "suggestions": [
+                    "Check reference_type values: 'Article', 'Book', 'Video', 'Podcast', 'Tool', 'Website'",
+                    "Verify status values: 'Active', 'Archived', 'To Review'",
+                    "Use rating values: 1-5 (minimum rating filter)"
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if ctx:
+            await ctx.error(f"References query failed: {str(e)}")
+            
+        return error_result
+    
+    except Exception as e:
+        if ctx:
+            await ctx.error(f"Unexpected error in references query: {str(e)}")
+            
+        return {
+            "success": False,
+            "error": {
+                "type": "UnexpectedError",
+                "message": f"Unexpected error: {str(e)}"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
+# =============================================================================
+# CRUD OPERATIONS TOOLS
+# =============================================================================
+
+@mcp.tool()
+async def delete_task(
+    task_id: str,
+    confirm: bool = False,
+    ctx: Optional[Context] = None
+) -> Dict[str, Any]:
+    """
+    Delete (archive) a task in Notion.
+    
+    Permanently archives a task by its ID. This action cannot be undone easily.
+    
+    Args:
+        task_id: The Notion page ID of the task to delete
+        confirm: Safety confirmation flag (must be True)
+        
+    Returns:
+        Success/failure status with task deletion details
+    """
+    try:
+        if not confirm:
+            return {
+                "success": False,
+                "error": {
+                    "type": "ConfirmationRequired",
+                    "message": "Task deletion requires confirmation. Set confirm=True to proceed.",
+                    "suggestions": ["Add confirm=True parameter to confirm deletion"]
+                },
+                "timestamp": datetime.now().isoformat()
+            }
+        
+        if ctx:
+            await ctx.info(f"Deleting task: {task_id}")
+        
+        # Build CLI command for task deletion
+        cmd = [VTM_COMMAND, "delete", "task", task_id, "--confirm"]
+        
+        if ctx:
+            await ctx.debug(f"Executing command: {' '.join(cmd)}")
+        
+        # Execute command
+        result = _execute_cli_command(cmd)
+        
+        if ctx:
+            await ctx.info(f"Task deletion completed")
+        
+        return result
+        
+    except (ValidationError, CliExecutionError) as e:
+        error_result = {
+            "success": False,
+            "error": {
+                "type": type(e).__name__,
+                "message": str(e),
+                "suggestions": [
+                    "Verify the task_id is valid and exists",
+                    "Ensure you have permission to delete tasks",
+                    "Check Notion API connectivity"
+                ]
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        if ctx:
+            await ctx.error(f"Task deletion failed: {str(e)}")
+            
+        return error_result
+    
+    except Exception as e:
+        if ctx:
+            await ctx.error(f"Unexpected error in task deletion: {str(e)}")
+            
+        return {
+            "success": False,
+            "error": {
+                "type": "UnexpectedError",
+                "message": f"Unexpected error: {str(e)}"
+            },
+            "timestamp": datetime.now().isoformat()
+        }
+
 @mcp.tool()
 async def server_info(ctx: Optional[Context] = None) -> Dict[str, Any]:
     """
@@ -518,6 +987,7 @@ async def server_info(ctx: Optional[Context] = None) -> Dict[str, Any]:
                 "cli_available": cli_available,
                 "cli_version": cli_version,
                 "available_tools": [
+                    # Core List Tools
                     {
                         "name": "list_tasks",
                         "description": "Query tasks from Notion with filtering options"
@@ -530,6 +1000,29 @@ async def server_info(ctx: Optional[Context] = None) -> Dict[str, Any]:
                         "name": "list_areas",
                         "description": "Query areas from Notion with summary information"
                     },
+                    # New Entity List Tools
+                    {
+                        "name": "list_goals",
+                        "description": "Query goals from Notion with progress tracking and area relationships"
+                    },
+                    {
+                        "name": "list_notes",
+                        "description": "Query notes from Notion with content, tags, and relationship information"
+                    },
+                    {
+                        "name": "list_events",
+                        "description": "Query events/meetings from Notion with timing and project relationships"
+                    },
+                    {
+                        "name": "list_references",
+                        "description": "Query references from Notion with ratings, categories, and relationships"
+                    },
+                    # CRUD Operations
+                    {
+                        "name": "delete_task",
+                        "description": "Delete (archive) a task in Notion with confirmation"
+                    },
+                    # Server Management
                     {
                         "name": "server_info",
                         "description": "Get server status and capability information"

@@ -17,6 +17,10 @@ Requires-Dist: black; extra == "dev"
 Requires-Dist: ruff; extra == "dev"
 Requires-Dist: mypy; extra == "dev"
 Requires-Dist: pytest-mock; extra == "dev"
+Provides-Extra: mcp
+Requires-Dist: mcp[cli]>=1.12.0; extra == "mcp"
+Provides-Extra: all
+Requires-Dist: voice-task-manager[dev,mcp]; extra == "all"
 
 # Voice Task Manager
 
@@ -25,7 +29,10 @@ A professional Python package that automatically converts voice recordings into 
 ## 🚀 Quick Start
 
 ```bash
-# Install the package
+# Install with uv (recommended - faster and more reliable)
+uv pip install voice-task-manager
+
+# Or install with pip (legacy)
 pip install voice-task-manager
 
 # Set up configuration
@@ -155,10 +162,28 @@ task-management/
    ```
 
 3. **Set up Python environment**
+   
+   **Using uv (recommended):**
+   ```bash
+   # Install uv (if not already installed)
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # Run automated migration
+   ./scripts/migrate-to-uv.sh
+   
+   # OR manual setup:
+   uv venv
+   source .venv/bin/activate
+   uv pip install -e ".[dev,mcp]"
+   ```
+   
+   **Using pip (legacy):**
    ```bash
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
+   pip install -r requirements-dev.txt
+   pip install -r mcp-requirements.txt
    ```
 
 4. **Test the system**

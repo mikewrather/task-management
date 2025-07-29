@@ -57,3 +57,27 @@ temp/
 
 # Session data
 session-summaries/
+
+# Python virtual environments
+venv/
+.venv/
+env/
+.env/
+venv_backup/
+
+# Python cache and build
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Package management
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.pipenv

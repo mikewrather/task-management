@@ -1,0 +1,26 @@
+{
+    "mcpServers": {
+        "agent-db": {
+            "command": "uv",
+            "args": [
+                "run",
+                "--directory",
+                "${PROJECT_AGENTS_DIR}",
+                "agent-db-server"
+            ],
+            "env": {
+                "NEO4J_PASSWORD": "agent-db-password",
+                "NEO4J_ENCRYPTED": "false"
+            }
+        },
+        "notion-task-management": {
+            "command": "/home/mike/development/task-management/notion_mcp_server.py",
+            "args": [],
+            "cwd": "/home/mike/development/task-management",
+            "env": {
+                "PYTHONPATH": "/home/mike/development/task-management/src",
+                "PATH": "/home/mike/development/task-management/.venv/bin:${PATH}"
+            }
+        }
+    }
+}

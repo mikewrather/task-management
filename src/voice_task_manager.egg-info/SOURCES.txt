@@ -21,7 +21,11 @@ src/voice_task_manager/integrations/notion.py
 src/voice_task_manager/integrations/whisper.py
 src/voice_task_manager/models/__init__.py
 src/voice_task_manager/models/notion_area.py
+src/voice_task_manager/models/notion_event.py
+src/voice_task_manager/models/notion_goal.py
+src/voice_task_manager/models/notion_note.py
 src/voice_task_manager/models/notion_project.py
+src/voice_task_manager/models/notion_reference.py
 src/voice_task_manager/models/task.py
 src/voice_task_manager/models/voice_file.py
 src/voice_task_manager/utils/__init__.py
