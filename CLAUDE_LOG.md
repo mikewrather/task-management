@@ -605,3 +605,80 @@ ADAPTER_MODE=both
 - Fine-tune Claude prompts based on results
 - Complete remaining task relationship mappings
 - Gradually migrate from Notion to GraphRAG as primary storage
+
+---
+
+## 2025-07-31 - Bug Fixes and Multi-Task Enhancement
+
+**Objective**: Fix critical bugs and enhance system to create all tasks mentioned in voice notes.
+
+**Issues Addressed**:
+
+1. **GraphRAG Adapter Bug (Critical)**:
+   - Error: `'list' object has no attribute 'get'` 
+   - Cause: MCP execute_cypher returns list directly, not dict with 'results' key
+   - Fix: Added response format handling for both dict and list types
+   - Files: `src/voice_task_manager/adapters/graphrag.py` (lines 262-476)
+
+2. **Notification Integration Bug**:
+   - Processor looking for old script `scripts/notification-system.py`
+   - Fix: Updated to import from `utils.notifications` module
+   - Removed unused subprocess/sys imports
+   - Files: `src/voice_task_manager/core/processor.py` (lines 332-361)
+
+3. **Single Task Limitation**:
+   - System only created first task from multi-task voice notes
+   - Additional tasks were identified but never created
+   - Users losing tasks when mentioning multiple items
+
+**Major Enhancement - Multi-Task Processing**:
+
+1. **Claude Prompt Redesign**:
+   - Changed from "focus on FIRST task only" to "extract ALL tasks"
+   - Updated examples to show multiple task extraction
+   - New JSON format returns `tasks` array instead of single `task_data`
+   - Files: `src/voice_task_manager/processors/claude_processor.py` (lines 146-263)
+
+2. **Processing Logic Updates**:
+   - `process_transcript()` returns `List[TaskData]` instead of `Optional[TaskData]`
+   - Each task independently categorized with own project/area
+   - Added task numbering and metadata tracking
+   - Files: Lines 28-112, 356-376
+
+3. **Integration Updates**:
+   - Updated processor_v2 to handle task arrays
+   - Loop creates each task in all adapters
+   - Better summary reporting for multiple tasks
+   - Files: `src/voice_task_manager/core/processor_v2.py` (lines 337-411)
+
+**Documentation Updates**:
+
+1. **Created Comprehensive Functionality Overview**:
+   - Complete list of all system capabilities
+   - All CLI commands and features documented
+   - Performance characteristics and limitations
+   - File: `docs/COMPREHENSIVE_FUNCTIONALITY_OVERVIEW.md`
+
+2. **Corrected Feature Spec Delta Analysis**:
+   - Fixed false claims about missing cron (it works)
+   - Fixed false claims about missing notifications (they exist)
+   - Removed references to unbuilt features
+   - Files: `docs/FEATURE_SPEC_DELTA_ANALYSIS.md`, `docs/specifications/FEATURE_SPECIFICATION.md`
+
+**Key Improvements**:
+- ✅ All tasks from voice notes now created (not just first)
+- ✅ GraphRAG adapter works with MCP responses
+- ✅ Notifications properly integrated
+- ✅ Documentation reflects actual system state
+- ✅ Better error handling for JSON parsing
+
+**Testing**:
+- Created `scripts/debug/test_multi_task_processing.py`
+- GraphRAG adapter tests passing
+- System ready for production use
+
+**Next Steps**:
+- Establish missing project-area relationships in GraphRAG
+- Re-process recent voice tasks with fixes applied
+- Monitor multi-task creation in production
+- Update user guide with new capabilities

@@ -43,6 +43,13 @@ python scripts/debug/get_areas_direct.py
 python scripts/debug/execute_cypher_query.py
 ```
 
+### Special Scripts
+- `test_multi_task_processing.py` - Test multi-task extraction from voice notes (NEW)
+
 ## Cleanup
 
 These scripts should be reviewed periodically and removed if no longer needed. Consider converting frequently-used debug scripts into proper CLI commands or tests.
+
+**Last Review**: 2025-07-31
+**Total Scripts**: 77 debug scripts
+**Status**: Many scripts created during GraphRAG/MCP debugging - consider consolidation
