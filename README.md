@@ -245,20 +245,31 @@ pytest tests/unit/test_adapters.py::TestTaskData -v
 
 ## 📚 Documentation
 
+- **[User Guide](docs/USER_GUIDE.md)** - Complete guide for end users ⭐
 - **[Project Structure](docs/operations/PROJECT_STRUCTURE.md)** - Detailed code organization
 - **[API Reference](docs/reference/api_reference.md)** - Complete API documentation
-- **[Setup Guides](docs/guides/setup/)** - Detailed setup instructions
+- **[Functionality Overview](docs/COMPREHENSIVE_FUNCTIONALITY_OVERVIEW.md)** - All features listed
 - **[Architecture](docs/architecture/)** - System design documentation
 - **[MCP Server Guide](docs/mcp-server-guide.md)** - MCP server details
 
 ## 🔮 Roadmap
 
-- [ ] Fix GraphRAG adapter list/dict issue
+### Recently Completed ✅
+- [x] Fix GraphRAG adapter list/dict issue
+- [x] Multi-task extraction from single voice notes
+- [x] Enhanced notification system integration
+- [x] Comprehensive documentation updates
+
+### In Progress 🚧
+- [ ] Complete voice file processing into GraphRAG
 - [ ] Add async processing support
+
+### Future Features 🔮
 - [ ] Implement real-time webhook processing
 - [ ] Add web dashboard for monitoring
 - [ ] Support for more voice input sources
 - [ ] Enhanced AI categorization with fine-tuning
+- [ ] Batch processing optimizations
 
 ## 📄 License
 
