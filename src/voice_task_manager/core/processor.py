@@ -7,8 +7,6 @@ clean, testable, and well-structured class-based implementation.
 """
 
 import os
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -332,35 +330,33 @@ class VoiceProcessor:
     def _send_notification(self, voice_file: VoiceFile, success: bool) -> None:
         """Send desktop notification about processing result"""
         try:
-            notification_script = self.project_root / 'scripts' / 'notification-system.py'
-            if not notification_script.exists():
-                return
+            from ..utils.notifications import notify_success, notify_error
             
             if success:
                 # Get the processed file info for notification
                 processed_file = self.database.get_voice_file(voice_file.file_id)
                 if processed_file and processed_file.transcript and processed_file.task_url:
-                    subprocess.run([
-                        sys.executable, str(notification_script), 'success',
-                        voice_file.file_id, 
-                        processed_file.transcript[:100], 
-                        processed_file.task_url
-                    ], check=False, timeout=10)
+                    # Create a simple task object for notification
+                    from ..models.task import NotionTask
+                    task = NotionTask(
+                        id="",  # Not needed for notification
+                        url=processed_file.task_url,
+                        name=processed_file.transcript[:100]
+                    )
+                    notify_success(processed_file, task)
             else:
-                subprocess.run([
-                    sys.executable, str(notification_script), 'error',
-                    voice_file.file_id,
-                    "Processing failed",
-                    ""
-                ], check=False, timeout=10)
+                notify_error(voice_file.file_id, "Processing failed")
                 
         except Exception as e:
             self.logger.warning("Desktop notification failed", exception=e, file_id=voice_file.file_id)
     
     def _is_notification_system_available(self) -> bool:
         """Check if the notification system is available"""
-        notification_script = self.project_root / 'scripts' / 'notification-system.py'
-        return notification_script.exists()
+        try:
+            from ..utils.notifications import VoiceNotificationSystem
+            return True
+        except ImportError:
+            return False
     
     def get_processing_stats(self) -> Dict[str, Any]:
         """Get comprehensive processing statistics"""

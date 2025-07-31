@@ -259,10 +259,20 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             "parameters": {"task_id": int(task_id)}
         })
         
-        if not response.get("success") or not response.get("results"):
+        # Handle both dict and list response formats
+        if isinstance(response, dict):
+            if not response.get("success") or not response.get("results"):
+                return None
+            results = response["results"]
+        elif isinstance(response, list):
+            results = response
+        else:
             return None
         
-        result = response["results"][0]
+        if not results:
+            return None
+            
+        result = results[0]
         task = result["t"]
         
         return TaskData(
@@ -290,8 +300,11 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             # Fallback to Cypher search
             return self._search_projects_cypher(query)
         
+        # Handle both dict and list response formats
+        results = response if isinstance(response, list) else response.get("results", [])
+        
         projects = []
-        for result in response.get("results", []):
+        for result in results:
             if result.get("labels") and "PROJECT" in result["labels"]:
                 projects.append({
                     "id": result.get("notion_id") or str(result.get("id")),
@@ -316,8 +329,13 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             "parameters": {"query": query}
         })
         
-        if response.get("success"):
-            return response.get("results", [])
+        # Handle both dict and list response formats
+        if isinstance(response, dict):
+            if response.get("success"):
+                return response.get("results", [])
+            return []
+        elif isinstance(response, list):
+            return response
         return []
     
     def search_areas(self, query: str) -> List[Dict[str, Any]]:
@@ -334,8 +352,13 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             "parameters": {"query": query}
         })
         
-        if response.get("success"):
-            return response.get("results", [])
+        # Handle both dict and list response formats
+        if isinstance(response, dict):
+            if response.get("success"):
+                return response.get("results", [])
+            return []
+        elif isinstance(response, list):
+            return response
         return []
     
     def get_categorization_context(self) -> Dict[str, Any]:
@@ -380,27 +403,34 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             "parameters": {}
         })
         
+        # Handle response format - MCP execute_cypher returns list directly
+        tasks_results = tasks_response if isinstance(tasks_response, list) else tasks_response.get("results", [])
+        projects_results = projects_response if isinstance(projects_response, list) else projects_response.get("results", [])
+        areas_results = areas_response if isinstance(areas_response, list) else areas_response.get("results", [])
+        
         context = {
-            "recent_tasks": tasks_response.get("results", []),
+            "recent_tasks": tasks_results,
             "project_patterns": {},
             "area_descriptions": {}
         }
         
         # Build project patterns
-        for project in projects_response.get("results", []):
-            context["project_patterns"][project["project_id"]] = {
-                "name": project["name"],
-                "area_id": project["area_id"],
-                "area_name": project["area_name"],
-                "keywords": self._extract_keywords(project["name"])
-            }
+        for project in projects_results:
+            if project.get("project_id"):
+                context["project_patterns"][project["project_id"]] = {
+                    "name": project["name"],
+                    "area_id": project.get("area_id"),
+                    "area_name": project.get("area_name", ""),
+                    "keywords": self._extract_keywords(project["name"])
+                }
         
         # Build area descriptions
-        for area in areas_response.get("results", []):
-            context["area_descriptions"][area["area_id"]] = {
-                "name": area["name"],
-                "keywords": self._extract_keywords(area["name"])
-            }
+        for area in areas_results:
+            if area.get("area_id"):
+                context["area_descriptions"][area["area_id"]] = {
+                    "name": area["name"],
+                    "keywords": self._extract_keywords(area["name"])
+                }
         
         return context
     
@@ -429,15 +459,20 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             "goals": []
         }
         
-        if response.get("success"):
-            for result in response.get("results", []):
-                labels = result.get("labels", [])
-                if "PROJECT" in labels:
-                    context["projects"].append(result)
-                elif "AREA" in labels:
-                    context["areas"].append(result)
-                elif "GOAL" in labels:
-                    context["goals"].append(result)
+        # Handle both dict and list response formats
+        results = response if isinstance(response, list) else response.get("results", [])
+        
+        if isinstance(response, dict) and not response.get("success"):
+            return context
+            
+        for result in results:
+            labels = result.get("labels", [])
+            if "PROJECT" in labels:
+                context["projects"].append(result)
+            elif "AREA" in labels:
+                context["areas"].append(result)
+            elif "GOAL" in labels:
+                context["goals"].append(result)
         
         return context
     
