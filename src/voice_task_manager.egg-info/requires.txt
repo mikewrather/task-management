@@ -3,6 +3,7 @@ openai>=1.93.0
 python-dotenv>=1.1.0
 click>=8.1.0
 rich>=13.0.0
+neo4j>=5.0.0
 
 [all]
 voice-task-manager[dev,mcp]
@@ -14,6 +15,7 @@ black
 ruff
 mypy
 pytest-mock
+psutil>=6.0.0
 
 [mcp]
 mcp[cli]>=1.12.0

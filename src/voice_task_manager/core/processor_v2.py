@@ -422,7 +422,7 @@ class VoiceProcessorV2:
     
     def _cleanup_processed_file(self, voice_file: VoiceFile) -> None:
         """Handle cleanup of processed voice files"""
-        cleanup_success = self.drive_client.cleanup_processed_file(voice_file)
+        cleanup_success = self.drive_client.cleanup_processed_file(voice_file, cleanup_method='move')
         
         if cleanup_success:
             self.logger.success("File cleanup completed", file_id=voice_file.file_id)

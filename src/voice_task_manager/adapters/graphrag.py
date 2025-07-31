@@ -21,6 +21,7 @@ class GraphRAGTaskAdapter(TaskAdapter):
         """
         self.logger = logger or VoiceLogger()
         self.claude_project = "task-management"
+        self.use_real_mcp = os.getenv('USE_REAL_MCP', 'false').lower() == 'true'
         
     def _execute_mcp_command(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -33,8 +34,108 @@ class GraphRAGTaskAdapter(TaskAdapter):
         Returns:
             Response from the MCP tool
         """
-        # For now, we'll create a simple mock implementation
-        # In production, this would use the actual MCP client
+        # Use real MCP if enabled
+        if self.use_real_mcp:
+            try:
+                # Build prompt for Claude to execute the MCP tool
+                tool_mapping = {
+                    "create_entity": "mcp__agent-db__create_entity",
+                    "execute_cypher": "mcp__agent-db__execute_cypher",
+                    "query_natural_language": "mcp__agent-db__query_natural_language",
+                    "get_health_status": "mcp__agent-db__get_health_status"
+                }
+                
+                mcp_tool_name = tool_mapping.get(tool_name)
+                if not mcp_tool_name:
+                    return {"success": False, "error": f"Unknown tool: {tool_name}"}
+                
+                # Create a prompt that will make Claude use the MCP tool
+                prompt = f"""Use the {mcp_tool_name} tool with these exact parameters:
+{json.dumps(parameters, indent=2)}
+
+Return ONLY the raw JSON result from the tool, with no additional text or formatting."""
+                
+                # Execute via claude -p in the project directory
+                # Use full path to claude command
+                claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+                cmd = [
+                    claude_path, 
+                    "-p", prompt,
+                    "--dangerously-skip-permissions",
+                    "--output-format", "json"
+                ]
+                
+                self.logger.debug(f"Executing real MCP command: {tool_name}")
+                
+                # Change to project directory to use its .mcp.json
+                import os
+                original_cwd = os.getcwd()
+                project_dir = "/home/mike/development/task-management"
+                
+                try:
+                    os.chdir(project_dir)
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=None,  # No timeout - let Claude finish
+                        env={**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
+                    )
+                finally:
+                    os.chdir(original_cwd)
+                
+                if result.returncode != 0:
+                    self.logger.error(f"Claude execution failed: {result.stderr}")
+                    # Fall back to mock
+                    self.logger.warning(f"Falling back to mock for {tool_name}")
+                else:
+                    # Try to extract JSON from response
+                    output = result.stdout.strip()
+                    
+                    # First check if this is a claude JSON output format
+                    try:
+                        claude_response = json.loads(output)
+                        if isinstance(claude_response, dict) and 'result' in claude_response:
+                            # Extract the result field which contains the actual response
+                            result_content = claude_response['result']
+                            # Remove markdown code block if present
+                            if result_content.startswith('```json') and result_content.endswith('```'):
+                                result_content = result_content[7:-3].strip()
+                            response = json.loads(result_content)
+                            self.logger.success(f"Real MCP execution successful for {tool_name}")
+                            return response
+                    except (json.JSONDecodeError, KeyError):
+                        pass
+                    
+                    # Fallback: Look for JSON in the output
+                    import re
+                    # Try to find a complete JSON object - look for the tool response
+                    # The response might be wrapped in the MCP tool response format
+                    json_patterns = [
+                        r'\{[^{}]*"success"[^{}]*:.*?\}(?=\s*$|\s*\n)',  # Look for success response
+                        r'\{[^{}]*"entity"[^{}]*:.*?\}',  # Look for entity response
+                        r'\{[^{}]*"components"[^{}]*:.*?\}',  # Look for health check response
+                        r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'  # Generic JSON object
+                    ]
+                    
+                    for pattern in json_patterns:
+                        json_match = re.search(pattern, output, re.DOTALL)
+                        if json_match:
+                            try:
+                                response = json.loads(json_match.group())
+                                self.logger.success(f"Real MCP execution successful for {tool_name}")
+                                return response
+                            except json.JSONDecodeError:
+                                continue
+                    
+                    self.logger.error(f"No valid JSON found in Claude response: {output[:200]}...")
+                        
+            except subprocess.TimeoutExpired:
+                self.logger.error(f"MCP execution timed out for {tool_name}")
+            except Exception as e:
+                self.logger.error(f"MCP execution error: {e}")
+        
+        # Fall back to mock implementation
         self.logger.warning(f"Mock MCP execution for {tool_name}")
         
         # Simulate successful responses for testing
@@ -80,7 +181,10 @@ class GraphRAGTaskAdapter(TaskAdapter):
                 "priority": task_data.priority,
                 "contexts": task_data.contexts,
                 "created": task_data.created_at.isoformat(),
-                "source": task_data.source
+                "source": task_data.source,
+                "project_name": task_data.project_name or "",
+                "area_name": task_data.area_name or "",
+                "goal_name": task_data.goal_name or ""
             }
         }
         
@@ -98,8 +202,21 @@ class GraphRAGTaskAdapter(TaskAdapter):
         task_id = response.get("entity", {}).get("id")
         
         # Create relationships if we have project/area/goal
-        if task_data.project_id and task_id:
-            self._create_relationship(task_id, task_data.project_id, "BELONGS_TO", "PROJECT")
+        if task_id:
+            # Create project relationship if available
+            if task_data.project_id:
+                self._create_relationship(task_id, task_data.project_id, "BELONGS_TO", "PROJECT")
+                self.logger.info(f"Created PROJECT relationship: Task -> {task_data.project_name}")
+            
+            # Create area relationship if available (even without project)
+            if task_data.area_id:
+                self._create_relationship(task_id, task_data.area_id, "RELATES_TO", "AREA")
+                self.logger.info(f"Created AREA relationship: Task -> {task_data.area_name}")
+            
+            # Create goal relationship if available
+            if task_data.goal_id:
+                self._create_relationship(task_id, task_data.goal_id, "CONTRIBUTES_TO", "GOAL")
+                self.logger.info(f"Created GOAL relationship: Task -> {task_data.goal_name}")
         
         return task_id
     
@@ -290,7 +407,14 @@ class GraphRAGTaskAdapter(TaskAdapter):
     def test_connection(self) -> bool:
         """Test GraphRAG connection"""
         response = self._execute_mcp_command("get_health_status", {})
-        return response.get("success", False)
+        # Check if we got a valid response
+        if isinstance(response, dict):
+            # For health status, check if we have components
+            if "components" in response:
+                return True
+            # For mock/error responses, check success field
+            return response.get("success", False)
+        return False
     
     def _get_entity_context(self, query: str) -> Dict[str, Any]:
         """Get relevant entities for a query"""

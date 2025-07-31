@@ -1,221 +1,264 @@
 # Voice Task Manager
 
-A professional Python package that automatically converts voice recordings into organized Notion tasks. Seamlessly integrates Google Drive, OpenAI Whisper, and Notion with robust performance monitoring and comprehensive testing.
+A modern Python package that automatically converts voice recordings into organized Notion tasks with intelligent categorization. Features multi-adapter storage (Notion + GraphRAG), comprehensive testing, and a clean architecture following Python best practices.
 
 ## 🚀 Quick Start
 
 ```bash
-# Install with uv (recommended - faster and more reliable)
-uv pip install voice-task-manager
+# Install UV (recommended - faster and more reliable than pip)
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Or install with pip (legacy)
-pip install voice-task-manager
+# Clone and setup
+git clone <repository-url>
+cd task-management
 
-# Set up configuration
+# Create virtual environment and install
+uv venv
+source .venv/bin/activate
+uv pip install -e ".[dev,mcp,all]"
+
+# Configure environment
 cp .env.example .env
 # Edit .env with your API keys
 
+# Run tests to verify setup
+pytest tests/unit/
+
 # Process voice files
-vtm process
-
-# View statistics
-vtm stats
+python -m voice_task_manager.core.processor
 ```
-
-## 📚 Documentation
-
-### Core Documentation
-- **[📖 User Guide](docs/user_guide.md)** - Complete setup and usage guide
-- **[🔧 API Reference](docs/api_reference.md)** - Detailed API documentation
-- **[⚡ Performance Analysis](docs/performance_analysis.md)** - Performance metrics and optimization
-
-### Migration Documentation  
-- **[🔄 Python Package Migration](docs/PYTHON_PACKAGE_MIGRATION.md)** - Migration from script-based to package architecture
-- **[🧹 Legacy Cleanup](CLEANUP_SUMMARY.md)** - Historical cleanup and organization
 
 ## 🎤 Voice to Task Pipeline
 
-1. **Record** voice note on mobile device
-2. **Sync** to Google Drive automatically  
-3. **Discover** new files via Google Drive API
-4. **Transcribe** with OpenAI Whisper API
-5. **Create** organized Notion task with context tags
-6. **Track** processing state in SQLite database
+```mermaid
+flowchart TB
+    VoiceRecording["🎤 Voice Recording<br/>(Mobile Device)"]
+    GoogleDrive["☁️ Google Drive Sync"]
+    Discovery["🔍 File Discovery"]
+    Whisper["🎯 Whisper Transcription"]
+    Claude["🤖 Claude AI Categorization"]
+    Storage["💾 Multi-Adapter Storage"]
+    Notion["📋 Notion<br/>(7 Entity Types)"]
+    GraphRAG["🧠 GraphRAG<br/>(Knowledge Graph)"]
+    SQLite["🗄️ SQLite Tracking"]
+    
+    VoiceRecording --> GoogleDrive
+    GoogleDrive --> Discovery
+    Discovery --> Whisper
+    Whisper --> Claude
+    Claude --> Storage
+    Storage --> Notion
+    Storage --> GraphRAG
+    Storage --> SQLite
+```
 
 ## ✨ Key Features
 
-- 🚀 **High Performance** - 0.2ms database operations, efficient memory usage
-- 🧪 **Fully Tested** - 33+ tests covering models, database, and performance
-- 📊 **Performance Monitoring** - Built-in metrics collection and analysis
-- 🔄 **Robust Processing** - Automatic retry logic and error handling
-- 🗄️ **SQLite Database** - Efficient tracking and duplicate prevention
-- 🎯 **Modern Architecture** - Clean Python package with proper separation of concerns
-- 📋 **CLI Interface** - Simple command-line tools for all operations
+### 🏗️ Modern Architecture
+- **Clean Package Structure** - `src/` layout following Python best practices
+- **Multi-Adapter Pattern** - Pluggable storage backends (Notion, GraphRAG)
+- **Comprehensive Testing** - Unit, integration, and E2E test suites
+- **UV Package Manager** - Fast, reliable dependency management
 
-## 📖 Additional Documentation
+### 🤖 Intelligent Processing
+- **Claude AI Integration** - Smart categorization into projects, areas, and contexts
+- **Whisper Transcription** - High-accuracy voice-to-text conversion
+- **Duplicate Prevention** - SQLite tracking ensures no duplicate processing
+- **Error Recovery** - Robust error handling and retry logic
 
-### Legacy Documentation
-- 📂 **[Project Structure](PROJECT_STRUCTURE.md)** - Repository organization
-- 📚 **[Documentation Index](docs/README.md)** - Historical documentation
-- 🏗️ **[System Architecture](docs/architecture/README.md)** - Technical architecture
-- 🎤 **[Voice Commands Reference](VOICE_COMMANDS_REFERENCE.md)** - Example commands
-- 🔐 **[Google Drive Setup](docs/guides/google-drive-setup.md)** - Drive integration
+### 📋 Notion Integration
+- **7 Entity Types** - Tasks, Projects, Areas, Goals, Notes, Events, References
+- **PARA Method** - Automatic organization following productivity best practices
+- **Full CRUD Operations** - Create, read, update, delete for all entities
+- **MCP Server** - 9 tools for comprehensive Notion interaction
 
-## 💡 Examples
-
-### Simple Voice Commands (API-only)
-- "Mark the login bug as complete"
-- "Create a task to review pull requests" 
-- "Add a note about the performance issue"
-- "Schedule meeting with John for tomorrow at 2pm"
-
-### Complex Voice Commands (Claude executes)
-- "Set up a Python project for the voice recognition system"
-- "Debug why the cron job failed last night"
-- "Create integration tests for the new API endpoints"
-- "Refactor the authentication module to use JWT tokens"
-
-## 🏗️ Architecture
-
-```
-Voice Recording (Apple Watch)
-        ↓
-Google Drive Sync
-        ↓
-Cron Automation (Every 5 minutes)
-        ↓
-Python Processing Pipeline
-    ├── File Detection (HTML Parsing + Validation)
-    ├── Download Audio File
-    ├── Transcribe (OpenAI Whisper)
-    ├── Create Notion Task
-    └── Cleanup Tracking
-```
-
-## 🔧 Key Innovation
-
-Pure Python automation that runs reliably via cron with comprehensive error handling, duplicate prevention, and file cleanup management. No complex orchestration needed - just works.
-
-## 🎛️ MCP Inspector Dashboard
-
-Interactive visual testing tool for the enhanced MCP server with 9 tools:
-
-```bash
-# Start MCP Inspector dashboard
-mcp dev notion_mcp_server.py
-# Opens at: http://localhost:6274
-
-# Or use our demo script
-./scripts/demo-mcp-inspector.sh
-```
-
-**Features:** Test all 9 MCP tools (Tasks, Projects, Areas, Goals, Notes, Events, References, Delete Task, Server Info) with real-time parameter testing and response visualization.
+### 🧠 GraphRAG Integration
+- **Knowledge Graph** - Neo4j-based relationship mapping
+- **Semantic Search** - Find related tasks and concepts
+- **Context Preservation** - Maintains relationships between entities
+- **Future-Ready** - Prepared for advanced AI features
 
 ## 📁 Project Structure
 
 ```
 task-management/
-├── docs/                          # 📚 Comprehensive documentation
-│   ├── README.md                 # Documentation hub
-│   ├── guides/                   # Setup and usage guides
-│   ├── architecture/             # System design docs
-│   └── setup/                    # Implementation guides
-├── scripts/                      # 🛠️ Automation and utility scripts  
-│   ├── README.md                # Scripts documentation
-│   ├── automated-voice-processor.py  # Main automation
-│   ├── cleanup-processed-files.py    # File management
-│   ├── voice-status.sh               # System monitoring
-│   └── analyze-voice-runs.py         # Statistics and analysis
-├── data/                        # 📊 SQLite database and logs
-│   └── processed_files.db       # Processing history
-├── logs/                        # 📝 System logs
-│   ├── voice-automation.log     # Detailed processing logs
-│   └── cron-run-history.log     # Run summaries
-└── .env.example                 # Configuration template
+├── src/voice_task_manager/     # Main package (following src layout)
+│   ├── adapters/              # Storage adapters (Notion, GraphRAG)
+│   ├── core/                  # Core business logic
+│   ├── integrations/          # External services (Drive, Whisper, Notion)
+│   ├── models/                # Data models for all entities
+│   ├── processors/            # AI processing (Claude)
+│   └── utils/                 # Utility functions
+├── tests/                     # Comprehensive test suites
+│   ├── unit/                  # Unit tests for components
+│   ├── integration/           # API integration tests
+│   └── e2e/                   # End-to-end workflow tests
+├── scripts/                   # Utility scripts (organized)
+│   ├── debug/                 # Debugging tools
+│   ├── analysis/              # Performance analysis
+│   └── maintenance/           # System maintenance
+└── docs/                      # Complete documentation
 ```
 
-## 🚀 Getting Started
+## 🔧 Installation & Setup
 
-1. **Clone the repository**
+### Prerequisites
+- Python 3.10+
+- UV package manager (recommended) or pip
+- API Keys: OpenAI, Notion, Google Drive credentials
+- Optional: Neo4j for GraphRAG features
+
+### Detailed Setup
+
+1. **Install UV (Recommended)**
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
+
+2. **Clone and Install**
    ```bash
    git clone <repository-url>
    cd task-management
-   ```
-
-2. **Configure your environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your API keys:
-   # - OPENAI_API_KEY (for Whisper transcription)
-   # - NOTION_TOKEN (for task creation)
-   # - NOTION_TASKS_DB (your tasks database ID)
-   # - GOOGLE_DRIVE_FOLDER_ID (your voice files folder)
-   ```
-
-3. **Set up Python environment**
    
-   **Using uv (recommended):**
-   ```bash
-   # Install uv (if not already installed)
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   
-   # Run automated migration
-   ./scripts/migrate-to-uv.sh
-   
-   # OR manual setup:
+   # Create virtual environment
    uv venv
    source .venv/bin/activate
-   uv pip install -e ".[dev,mcp]"
+   
+   # Install with all features
+   uv pip install -e ".[dev,mcp,all]"
+   ```
+
+3. **Configure Environment**
+   ```bash
+   cp .env.example .env
    ```
    
-   **Using pip (legacy):**
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   pip install -r requirements-dev.txt
-   pip install -r mcp-requirements.txt
+   Edit `.env` with your credentials:
+   ```env
+   # Core APIs
+   OPENAI_API_KEY=sk-...
+   NOTION_TOKEN=secret_...
+   NOTION_TASKS_DB=...
+   NOTION_PROJECTS_DB=...
+   NOTION_AREAS_DB=...
+   # ... other Notion DBs
+   
+   # Google Drive
+   GOOGLE_DRIVE_FOLDER_ID=...
+   
+   # GraphRAG (Optional)
+   NEO4J_URI=bolt://localhost:7687
+   NEO4J_USER=neo4j
+   NEO4J_PASSWORD=...
+   
+   # Claude API
+   ANTHROPIC_API_KEY=sk-ant-...
    ```
 
-4. **Test the system**
+4. **Verify Installation**
    ```bash
-   ./scripts/voice-cron-wrapper.sh
+   # Run tests
+   pytest tests/unit/ -v
+   
+   # Check imports
+   python -c "from voice_task_manager.core.processor import VoiceProcessor; print('✅ Setup complete!')"
    ```
 
-For detailed instructions, see the **[Feature Specification](docs/FEATURE_SPECIFICATION.md)**.
+## 🎛️ MCP Inspector Dashboard
 
-## 🔑 Required Components
+Interactive visual testing tool for the Notion MCP server:
 
-- **Voice Input**: Apple Watch with Voice Recorder Pro
-- **Storage**: Google Drive for audio files (public folder access)
-- **Transcription**: OpenAI Whisper API
-- **Task Management**: Notion databases with PARA method
-- **Automation**: Python 3.11+ with cron scheduling
-- **Database**: SQLite for processing history and duplicate prevention
+```bash
+# Start MCP Inspector
+npx @modelcontextprotocol/inspector notion_mcp_server.py
 
-## 💰 Cost Estimate
+# Or use the convenience script
+./scripts/start-mcp-inspector.sh
+```
 
-- Whisper API: ~$5/month (500 recordings)
-- Notion: Free (personal) or $8/month (Pro)
-- Google Drive: Free (15GB) or $6/month (100GB)
-- **Total**: ~$5-19/month for fully automated voice-to-task system
+**Available Tools:**
+- `create-task`, `delete-task` - Task management
+- `create-project`, `create-area`, `create-goal` - PARA entities
+- `create-note`, `create-event`, `create-reference` - Content entities
+- `server-info` - Server diagnostics
 
-## 🌟 Benefits
+## 🧪 Testing
 
-- **Natural Language**: No rigid command syntax
-- **Fully Automated**: Set it and forget it - runs every 5 minutes
-- **Reliable Processing**: Duplicate prevention and comprehensive error handling
-- **Fast Transcription**: High-accuracy OpenAI Whisper integration
-- **Organized Tasks**: PARA methodology with intelligent categorization
-- **File Management**: Built-in cleanup tools and storage management
+```bash
+# Run all tests
+pytest
+
+# Run specific test suites
+pytest tests/unit/              # Fast unit tests
+pytest tests/integration/       # API integration tests
+pytest tests/e2e/              # Full workflow tests
+
+# Run with coverage
+pytest --cov=voice_task_manager --cov-report=html
+
+# Run specific test
+pytest tests/unit/test_adapters.py::TestTaskData -v
+```
+
+## 📊 Performance
+
+- **Database Operations**: ~0.2ms per query
+- **Transcription**: ~5-10s per minute of audio
+- **Task Creation**: <1s including categorization
+- **Memory Usage**: <100MB for typical workload
+- **Test Coverage**: 135+ passing tests
+
+## 💡 Usage Examples
+
+### Simple Voice Commands
+```
+"Create a task to review the quarterly reports"
+"Add a note about the team meeting decisions"
+"New project for the mobile app redesign"
+"Schedule dentist appointment for next Tuesday"
+```
+
+### Complex Commands (Claude processes)
+```
+"Set up a comprehensive testing strategy for the new API endpoints"
+"Create a project plan for migrating to microservices"
+"Research and document best practices for GraphQL implementation"
+```
 
 ## 🤝 Contributing
 
-When contributing to this project:
-1. Keep documentation up-to-date
-2. Place scripts in appropriate directories
-3. Follow established patterns
-4. Update relevant README files
+1. **Follow Python Best Practices**
+   - Use `src/` layout
+   - Write comprehensive tests
+   - Update documentation
+   - Run `ruff` and `black` before committing
+
+2. **Testing Requirements**
+   - Add unit tests for new features
+   - Update integration tests for API changes
+   - Maintain >80% test coverage
+
+3. **Documentation**
+   - Update relevant `.md` files
+   - Add docstrings to new functions
+   - Update API reference if needed
+
+## 📚 Documentation
+
+- **[Project Structure](docs/operations/PROJECT_STRUCTURE.md)** - Detailed code organization
+- **[API Reference](docs/reference/api_reference.md)** - Complete API documentation
+- **[Setup Guides](docs/guides/setup/)** - Detailed setup instructions
+- **[Architecture](docs/architecture/)** - System design documentation
+- **[MCP Server Guide](docs/mcp-server-guide.md)** - MCP server details
+
+## 🔮 Roadmap
+
+- [ ] Fix GraphRAG adapter list/dict issue
+- [ ] Add async processing support
+- [ ] Implement real-time webhook processing
+- [ ] Add web dashboard for monitoring
+- [ ] Support for more voice input sources
+- [ ] Enhanced AI categorization with fine-tuning
 
 ## 📄 License
 
@@ -223,4 +266,4 @@ When contributing to this project:
 
 ---
 
-*Last Updated: 2025-07-24*
+*A modern, well-architected Python package for voice-driven task management with AI-powered categorization and multi-backend storage.*

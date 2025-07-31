@@ -9,9 +9,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from click.testing import CliRunner
 
-from src.voice_task_manager.cli import main
-from src.voice_task_manager.core.processor import VoiceProcessor
-from src.voice_task_manager.utils.database import VoiceDatabase
+from voice_task_manager.cli import main
+from voice_task_manager.core.processor import VoiceProcessor
+from voice_task_manager.utils.database import VoiceDatabase
 
 
 class TestUserWorkflows:

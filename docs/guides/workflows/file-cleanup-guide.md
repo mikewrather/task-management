@@ -185,31 +185,6 @@ DEBUG=true
 
 ---
 
-## 🔮 **Future Automation (Planned)**
-
-### **Phase 1: Google Drive API Integration**
-When Drive API integration is implemented, the system will support:
-
-```bash
-# Automatic file cleanup after processing
-CLEANUP_PROCESSED_FILES=true
-CLEANUP_METHOD=rename  # or 'move' or 'delete'
-CLEANUP_DELAY_HOURS=24
-
-# Batch cleanup operations
-./scripts/cleanup-processed-files.py --auto-cleanup --dry-run
-./scripts/cleanup-processed-files.py --auto-cleanup --confirm
-```
-
-### **Enhanced Features**
-- **Automated Renaming**: Add "PROCESSED_" prefix automatically
-- **Folder Organization**: Move files to date-based subfolders
-- **Batch Operations**: Process multiple files with confirmation
-- **Cleanup Policies**: Different rules for different file ages
-- **Integration**: Cleanup notifications via existing notification system
-
----
-
 ## 🔒 **Safety & Data Integrity**
 
 ### **Data Safety Guarantees**
@@ -280,4 +255,4 @@ tail -100 logs/voice-automation.log | grep cleanup
 **Last Updated**: 2025-07-24  
 **Next Review**: After Google Drive API integration implementation
 
-*This guide covers the current manual cleanup system and future automation plans for the voice task management project.*
+*This guide covers the current manual cleanup system for the voice task management project.*

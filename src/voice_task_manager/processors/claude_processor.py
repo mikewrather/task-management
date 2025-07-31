@@ -72,7 +72,8 @@ class ClaudeVoiceProcessor:
                 metadata={
                     "voice_file_id": voice_file_id,
                     "claude_confidence": task_info.get("confidence", 0),
-                    "reasoning": task_info.get("reasoning", "")
+                    "reasoning": task_info.get("reasoning", ""),
+                    "additional_tasks": task_info.get("additional_tasks", [])
                 }
             )
             
@@ -80,6 +81,16 @@ class ClaudeVoiceProcessor:
                 f"Task categorized: Project={task_data.project_name}, "
                 f"Area={task_data.area_name}, Priority={task_data.priority}"
             )
+            
+            # Log if additional tasks were mentioned
+            additional_tasks = task_info.get("additional_tasks", [])
+            if additional_tasks and len(additional_tasks) > 0:
+                # Filter out example entries
+                real_additional_tasks = [t for t in additional_tasks if not t.startswith("List any") and not t.startswith("E.g.,")]
+                if real_additional_tasks:
+                    self.logger.info(
+                        f"📝 Additional tasks mentioned ({len(real_additional_tasks)}): {', '.join(real_additional_tasks[:3])}"
+                    )
             
             return task_data
             
@@ -122,12 +133,7 @@ class ClaudeVoiceProcessor:
             if area_list:
                 areas_text = "Available areas:\\n" + "\\n".join(area_list)
         
-        prompt = f"""You are processing a voice task transcript. Analyze it and determine:
-1. The appropriate task name (concise, action-oriented)
-2. Which project it belongs to (if any)
-3. Which area it relates to
-4. The priority level
-5. Any specific contexts/tags
+        prompt = f"""You are an intelligent task categorization system. Your job is to analyze a voice transcript and establish proper relationships with existing projects and areas in the GraphRAG database.
 
 Voice transcript: "{transcript}"
 
@@ -137,14 +143,69 @@ Voice transcript: "{transcript}"
 
 {areas_text}
 
-Instructions:
-1. First, use the mcp__agent-db__query_natural_language tool to search for relevant projects based on the transcript content
-2. If you find a matching project, get its area relationship
-3. If no exact project match, consider creating a new task without a project but suggest which area it might belong to
-4. Extract any specific contexts mentioned (e.g., @phone, @computer, @home)
-5. Determine priority based on urgency words or context
+IMPORTANT: ANALYZE THE TRANSCRIPT STRUCTURE FIRST:
 
-Return a JSON response with this structure:
+1. **Single vs Multiple Tasks**:
+   - If the transcript contains multiple distinct tasks (e.g., "I need to do X. Also, Y. And don't forget Z"), you should focus on the FIRST task only
+   - Return a clear, actionable task name, NOT the entire transcript
+   - Examples:
+     - Bad: "I just thought of a couple things for sleep worlds..."
+     - Good: "Set up Android emulator for Adapty migration testing"
+
+2. **Task Extraction Guidelines**:
+   - Extract the core action from conversational language
+   - Create succinct, actionable task names (verb + object)
+   - Put additional context in the description, not the title
+   - If multiple tasks are mentioned, note in reasoning that additional tasks were mentioned
+
+CRITICAL INSTRUCTIONS FOR RELATIONSHIP DISCOVERY:
+
+1. **Search for Related Entities** (MANDATORY):
+   - Use mcp__agent-db__query_natural_language to search for: "{transcript}"
+   - Look for projects, areas, and similar tasks that might be related
+   - Search with different keywords from the transcript if the first search yields no results
+   - Consider partial matches and semantic similarity
+
+2. **Establish Project Relationships**:
+   - If the transcript mentions a project name (even partially), search for it
+   - If the task is clearly related to an existing project's scope, link it
+   - Use mcp__agent-db__execute_cypher to query relationships if needed:
+     MATCH (p:PROJECT)-[:BELONGS_TO]->(a:AREA) WHERE p.name CONTAINS 'keyword' RETURN p, a
+
+3. **Determine Area Assignment**:
+   - Every task should have an area if possible
+   - If no project is found, still try to match to an appropriate area
+   - Areas are broader than projects (e.g., "Work", "Personal", "Health", etc.)
+
+4. **Create Meaningful Relationships**:
+   - Don't leave tasks orphaned without relationships
+   - If unsure between two projects/areas, choose the most likely one and explain in reasoning
+   - Look at similar recent tasks to understand patterns
+
+5. **Extract Context and Priority**:
+   - Contexts: location (@home, @office), tool (@computer, @phone), time (@evening)
+   - Priority: Listen for urgency words ("urgent", "ASAP", "important", "quick")
+
+SEARCH STRATEGY:
+- First search: Full transcript
+- Second search: Key nouns/verbs from transcript
+- Third search: Look for similar tasks and their relationships
+
+EXAMPLES OF GOOD TASK EXTRACTION:
+
+Transcript: "I just thought of a couple things for sleep worlds. I need to figure out if I can get the emulator set up for android to automate the testing of the adapty migration. Also, I need to make sure that I'm forwarding events from adapty to revenuecat until we cut over"
+Good Task Name: "Set up Android emulator for Adapty migration testing"
+Description: "Configure Android emulator to automate testing of the Adapty migration in Sleep Worlds. Note: Also need to forward events from Adapty to RevenueCat until cutover."
+Project: Search for "Adapty Migration" project
+Area: "Sleep Worlds" or "[Sleep Worlds] Android"
+
+Transcript: "For the house, I need to call the plumber about the kitchen sink and also get quotes for the new fence"
+Good Task Name: "Call plumber about kitchen sink"
+Description: "Kitchen sink issue needs plumber attention. Note: Also need to get fence quotes."
+Project: Search for home maintenance projects
+Area: "House"
+
+Return a JSON response:
 {{
     "success": true,
     "task_data": {{
@@ -158,11 +219,15 @@ Return a JSON response with this structure:
         "area_id": "notion_id if found",
         "area_name": "Area name if found",
         "confidence": 0.0-1.0,
-        "reasoning": "Brief explanation of categorization"
+        "reasoning": "Explain: 1) What searches you performed, 2) Why you chose this project/area, 3) If multiple tasks were mentioned, list them, 4) Any assumptions made",
+        "additional_tasks": [
+            "List any other tasks mentioned in the transcript that should be created separately",
+            "E.g., 'Forward events from Adapty to RevenueCat until cutover'"
+        ]
     }}
 }}
 
-IMPORTANT: Use the MCP tools to search for and verify project/area relationships before making assignments."""
+REMEMBER: Your goal is to create a well-connected knowledge graph. Every task should have meaningful relationships whenever possible."""
         
         return prompt
     
@@ -170,27 +235,46 @@ IMPORTANT: Use the MCP tools to search for and verify project/area relationships
         """Execute Claude with MCP access for intelligent processing"""
         try:
             # Use Claude with project context and MCP access
-            cmd = [
-                "claude", 
-                "-p", self.claude_project,
-                "--dangerously-skip-permissions"
-            ]
+            # Use full path to claude command
+            claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
             
             # Add instruction to use MCP tools
             full_prompt = f"""{prompt}
 
 Remember to:
-1. Use mcp__agent-db__query_natural_language to search for relevant projects
-2. Use mcp__agent-db__execute_cypher if you need specific relationship queries
+1. Use mcp__agent-db__query_natural_language to search for relevant projects and areas
+2. Use mcp__agent-db__execute_cypher for specific queries like:
+   - MATCH (p:PROJECT) WHERE toLower(p.name) CONTAINS toLower('keyword') RETURN p
+   - MATCH (a:AREA) WHERE toLower(a.name) CONTAINS toLower('keyword') RETURN a
+   - MATCH (t:TASK)-[:BELONGS_TO]->(p:PROJECT) WHERE t.name CONTAINS 'similar' RETURN t, p
 3. Return ONLY the JSON response, no explanations"""
             
-            result = subprocess.run(
-                cmd,
-                input=full_prompt,
-                capture_output=True,
-                text=True,
-                timeout=60  # Longer timeout for MCP operations
-            )
+            cmd = [
+                claude_path, 
+                "-p", full_prompt,
+                "--dangerously-skip-permissions",
+                "--output-format", "json"
+            ]
+            
+            self.logger.info(f"Executing Claude with MCP access")
+            self.logger.debug(f"Prompt length: {len(full_prompt)} characters")
+            
+            # Change to project directory to use its .mcp.json
+            import os
+            original_cwd = os.getcwd()
+            project_dir = "/home/mike/development/task-management"
+            
+            try:
+                os.chdir(project_dir)
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=None,  # No timeout - let Claude finish
+                    env={**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
+                )
+            finally:
+                os.chdir(original_cwd)
             
             if result.returncode != 0:
                 return {"success": False, "error": f"Claude execution failed: {result.stderr}"}
@@ -211,9 +295,16 @@ Remember to:
                     self.logger.error(f"Failed to parse Claude response: {output[:500]}")
                     return {"success": False, "error": "Invalid JSON response"}
                     
-        except subprocess.TimeoutExpired:
-            return {"success": False, "error": "Claude execution timed out"}
+        except subprocess.TimeoutExpired as e:
+            self.logger.error(f"Claude execution timed out after 120 seconds")
+            # Try to get partial output
+            if hasattr(e, 'stdout') and e.stdout:
+                self.logger.debug(f"Partial stdout: {e.stdout[:500]}")
+            if hasattr(e, 'stderr') and e.stderr:
+                self.logger.debug(f"Partial stderr: {e.stderr[:500]}")
+            return {"success": False, "error": "Claude execution timed out after 120 seconds"}
         except Exception as e:
+            self.logger.error(f"Unexpected error in Claude execution: {e}")
             return {"success": False, "error": f"Execution error: {str(e)}"}
     
     def batch_process_transcripts(self, transcripts: List[Dict[str, str]]) -> List[TaskData]:

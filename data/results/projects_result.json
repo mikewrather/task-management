@@ -1,0 +1,74 @@
+[
+  {
+    "project_id": "1c766c0c-73af-801b-9167-f1c377921718",
+    "name": "Get SPAs signed",
+    "area_id": "1ba66c0c-73af-8118-93b1-e28a868bdec6",
+    "area_name": "Sleep Worlds"
+  },
+  {
+    "project_id": "1ba66c0c-73af-8161-b631-f5be460f51d2",
+    "name": "Adapty Migration",
+    "area_id": "1ba66c0c-73af-8118-93b1-e28a868bdec6",
+    "area_name": "Sleep Worlds"
+  },
+  {
+    "project_id": "1ba66c0c-73af-81d5-8e33-f84e585d3611",
+    "name": "GCLID Android Debugging",
+    "area_id": "1ba66c0c-73af-8118-93b1-e28a868bdec6",
+    "area_name": "Sleep Worlds"
+  },
+  {
+    "project_id": "1ba66c0c-73af-817a-810f-e7cead6a9234",
+    "name": "Remote Logging Setup",
+    "area_id": "1ba66c0c-73af-8118-93b1-e28a868bdec6",
+    "area_name": "Sleep Worlds"
+  },
+  {
+    "project_id": "1ba66c0c-73af-8156-82d0-f5a571c0b4be",
+    "name": "Facebook Events Verification",
+    "area_id": "1ba66c0c-73af-8118-93b1-e28a868bdec6",
+    "area_name": "Sleep Worlds"
+  },
+  {
+    "project_id": "1ba66c0c-73af-816d-b267-c5218700bf54",
+    "name": "Garmin launch project",
+    "area_id": "1ba66c0c-73af-811c-a851-d553a2a6b01b",
+    "area_name": "Google"
+  },
+  {
+    "project_id": "1ba66c0c-73af-8181-8d86-e332da3bf138",
+    "name": "Automated Bug Analysis Tool",
+    "area_id": "1ba66c0c-73af-811c-a851-d553a2a6b01b",
+    "area_name": "Google"
+  },
+  {
+    "project_id": "1ba66c0c-73af-81c4-ae10-df377d253dd5",
+    "name": "Search Service Migration",
+    "area_id": "1ba66c0c-73af-811c-a851-d553a2a6b01b",
+    "area_name": "Google"
+  },
+  {
+    "project_id": "efd0d285-0512-4a07-92bc-698b1fa2a19e",
+    "name": "Get Bike Fixed and Tuned",
+    "area_id": "fdfda896-5b63-4261-abb0-48df58cd8e47",
+    "area_name": "Cycling"
+  },
+  {
+    "project_id": "a3e062c9-089b-4027-86fe-74cc9cb43ecc",
+    "name": "Create Treehouse Office Project Plan",
+    "area_id": "1bf10f77-ef80-4bca-87a4-80a480d3404d",
+    "area_name": "House"
+  },
+  {
+    "project_id": "7720663e-3ccf-40e2-9d51-e75e6c9a14ff",
+    "name": "Wire new smoke alarms",
+    "area_id": "1bf10f77-ef80-4bca-87a4-80a480d3404d",
+    "area_name": "House"
+  },
+  {
+    "project_id": "1d566c0c-73af-802b-999b-cc5e79817965",
+    "name": "Front yard landscaping",
+    "area_id": "1bf10f77-ef80-4bca-87a4-80a480d3404d",
+    "area_name": "House"
+  }
+]

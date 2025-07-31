@@ -1,7 +1,7 @@
 # Voice Task Management Project Structure
 
-**Date**: 2025-07-24  
-**Purpose**: Clean Python-based automation system structure
+**Date**: 2025-07-31  
+**Purpose**: Modern Python package with clean architecture and comprehensive testing
 
 ---
 
@@ -9,134 +9,268 @@
 
 ```
 task-management/
-├── 📚 docs/                     # All documentation
-│   ├── 📖 README.md            # Documentation hub and index
-│   ├── 📋 FEATURE_SPECIFICATION.md  # Complete system spec
-│   ├── 🏗️ architecture/        # System design and diagrams
-│   │   ├── README.md
-│   │   └── system-design.md
-│   ├── 📐 setup/                # Installation and configuration
-│   │   └── README.md
-│   ├── 📚 guides/               # User guides and workflows
-│   │   ├── complete-voice-flow.md
-│   │   ├── voice-workflow-guide.md
-│   │   ├── google-drive-setup.md
-│   │   ├── claude-agent-voice-workflow.md
-│   │   └── file-cleanup-guide.md
-│   ├── 📝 notion/               # Notion integration docs
-│   │   └── para-methodology.md
-│   └── 📊 PROJECT_ORGANIZATION.md
-├── 🛠️ scripts/                  # All automation and utility scripts
-│   ├── 📖 README.md            # Scripts documentation
-│   ├── 🎤 automated-voice-processor.py  # Main automation
-│   ├── 📊 analyze-voice-runs.py # Log analysis and stats
-│   ├── 🔍 voice-status.sh      # System health check
-│   ├── 🧹 cleanup-processed-files.py  # File management
-│   ├── 📬 notification-system.py # Desktop notifications
-│   ├── 🔄 voice-cron-wrapper.sh # Cron execution wrapper
-│   └── 📋 voice_logging.py      # Centralized logging system
-├── 📊 data/                    # System data and databases
-│   └── processed_files.db     # SQLite tracking database
-├── 📝 logs/                    # System logs
-│   ├── voice-automation.log   # Detailed processing logs
-│   └── cron-run-history.log   # Run summaries
-├── 📄 Configuration Files
-│   ├── .env.example           # Environment template
-│   ├── 📋 README.md            # Project overview and quick start
-│   ├── 📚 CLAUDE_LOG.md        # Development session history
-│   └── 🎤 VOICE_COMMANDS_REFERENCE.md # Example voice commands
-└── 🗂️ Root Organization
-    └── PROJECT_STRUCTURE.md    # This file
+├── 📦 src/                          # Source code (Python package)
+│   └── voice_task_manager/          # Main package
+│       ├── __init__.py
+│       ├── 🎯 core/                 # Core business logic
+│       │   ├── __init__.py
+│       │   ├── processor.py        # Main voice processing orchestrator
+│       │   ├── database.py         # SQLite database operations
+│       │   └── notifications.py    # Notification system
+│       ├── 🔌 adapters/             # Storage adapters (Notion, GraphRAG)
+│       │   ├── __init__.py
+│       │   ├── base.py             # Abstract base adapter
+│       │   ├── notion.py           # Notion task adapter
+│       │   └── graphrag.py         # GraphRAG/Neo4j adapter
+│       ├── 🌐 integrations/         # External service integrations
+│       │   ├── __init__.py
+│       │   ├── drive.py            # Google Drive client
+│       │   ├── whisper.py          # OpenAI Whisper client
+│       │   └── notion.py           # Notion API client
+│       ├── 📊 models/               # Data models
+│       │   ├── __init__.py
+│       │   ├── task.py             # Task data model
+│       │   ├── voice_file.py       # Voice file model
+│       │   └── notion_*.py         # Notion entity models (7 types)
+│       ├── 🔄 processors/           # Processing logic
+│       │   ├── __init__.py
+│       │   ├── claude.py           # Claude AI processor
+│       │   └── context.py          # Context extraction
+│       └── 🛠️ utils/                # Utility functions
+│           ├── __init__.py
+│           └── logging.py          # Logging configuration
+│
+├── 🧪 tests/                        # Test suites
+│   ├── __init__.py
+│   ├── unit/                        # Unit tests
+│   │   ├── test_adapters.py
+│   │   ├── test_database.py
+│   │   ├── test_models.py
+│   │   ├── test_processors.py
+│   │   └── test_performance.py
+│   ├── integration/                 # Integration tests
+│   │   ├── test_api_integration_flow.py
+│   │   ├── test_google_drive_integration.py
+│   │   ├── test_notion_integration.py
+│   │   ├── test_openai_integration.py
+│   │   └── test_*_crud_methods.py
+│   └── e2e/                         # End-to-end tests
+│       ├── test_system_scenarios.py
+│       └── test_user_workflows.py
+│
+├── 📜 scripts/                      # Utility scripts (organized)
+│   ├── 📖 README.md                 # Scripts documentation
+│   ├── debug/                       # Debugging utilities
+│   │   ├── check_*.py              # Various check scripts
+│   │   ├── test_*.py               # Test utilities
+│   │   └── verify_*.py             # Verification scripts
+│   ├── analysis/                    # Log and performance analysis
+│   │   ├── analyze_*.py            # Analysis tools
+│   │   └── performance_*.py        # Performance tools
+│   ├── maintenance/                 # System maintenance
+│   │   ├── check_project_structure.py
+│   │   ├── fix_*.py                # Fix utilities
+│   │   └── clean_*.py              # Cleanup tools
+│   └── legacy/                      # Legacy utilities (to be removed)
+│       └── migrate_to_uv.sh
+│
+├── 📚 docs/                         # Documentation
+│   ├── 📖 README.md                 # Documentation hub
+│   ├── architecture/                # System design
+│   │   ├── mcp-server-design.md
+│   │   └── project-design.md
+│   ├── guides/                      # User guides
+│   │   ├── setup/                   # Setup guides
+│   │   ├── integrations/            # Integration guides
+│   │   └── workflows/               # Workflow guides
+│   ├── operations/                  # Operational docs
+│   │   ├── PROJECT_STRUCTURE.md    # This file
+│   │   └── LOGGING_SYSTEM.md
+│   ├── reference/                   # API references
+│   │   ├── api_reference.md
+│   │   └── mcp-server-reference.md
+│   └── specifications/              # Feature specs
+│       └── FEATURE_SPECIFICATION.md
+│
+├── 📊 data/                         # Persistent data
+│   ├── processed_files.db          # SQLite database
+│   └── README.md
+│
+├── 📝 logs/                         # System logs
+│   ├── voice-automation.log
+│   └── README.md
+│
+├── 🔧 Configuration                 # Config files
+│   ├── pyproject.toml              # Python package configuration
+│   ├── uv.lock                     # UV lock file
+│   ├── .env.example                # Environment template
+│   ├── .gitignore
+│   ├── notion_mcp_server.py        # MCP server implementation
+│   └── .mcp.json                   # MCP configuration
+│
+└── 📋 Project Files
+    ├── README.md                   # Project overview
+    ├── CLAUDE.md                   # Project-specific Claude instructions
+    ├── CLAUDE_LOG.md              # Development history
+    └── UV_MIGRATION_SUMMARY.md    # UV migration details
 ```
 
 ---
 
 ## 🎯 **Key Design Principles**
 
-### **Documentation First**
-- All documentation centralized in `/docs/` with clear hierarchy
-- README files at every level for navigation
-- Feature specification as single source of truth
-- Development history preserved in CLAUDE_LOG.md
+### **Modern Python Package Structure**
+- Follows Python best practices with `src/` layout
+- Clean separation of concerns with dedicated modules
+- Comprehensive test coverage (unit, integration, e2e)
+- Uses UV package manager for fast, reliable dependency management
 
-### **Script Organization**
-- All automation in `/scripts/` directory
-- Clear naming conventions (purpose-context-type.extension)
-- Comprehensive script documentation in scripts/README.md
-- Executable scripts have proper permissions and shebangs
+### **Multi-Adapter Architecture**
+- Base adapter pattern for extensibility
+- Notion adapter for task management
+- GraphRAG adapter for knowledge graph integration
+- Easy to add new storage backends
 
-### **Python Automation**
-- Pure Python implementation with minimal dependencies
-- Cron-based scheduling for reliable automation
-- SQLite database for persistent state and tracking
-- Comprehensive logging with structured data
+### **External Service Integration**
+- Clean integration layer for external APIs
+- Google Drive for voice file storage
+- OpenAI Whisper for transcription
+- Notion API for task creation
+- Claude AI for intelligent categorization
+
+### **Comprehensive Testing**
+- Unit tests for all core components
+- Integration tests for API interactions
+- End-to-end tests for complete workflows
+- Performance tests for optimization
 
 ---
 
-## 🔄 **Workflow Architecture**
+## 🔄 **Voice Processing Pipeline**
 
-### **Voice Processing Pipeline**
 ```
-Apple Watch Recording
+Voice Recording (Mobile Device)
         ↓
 Google Drive Sync
         ↓
-Cron Automation (5 min)
+Voice Processor Discovery
         ↓
-Python File Detection
+Download & Validation
         ↓
 Whisper Transcription
         ↓
-Notion Task Creation
+Claude AI Categorization
         ↓
-SQLite Tracking
+Multi-Adapter Storage
+    ├── Notion (Tasks, Projects, Areas, etc.)
+    └── GraphRAG (Knowledge Graph)
+        ↓
+SQLite Tracking & Deduplication
 ```
-
-### **System Components**
-- **Input**: Apple Watch Voice Recorder Pro
-- **Storage**: Google Drive public folder
-- **Automation**: Python scripts with cron scheduling
-- **Transcription**: OpenAI Whisper API
-- **Database**: SQLite for processing history
-- **Output**: Notion PARA databases
-- **Monitoring**: Comprehensive logging and notifications
 
 ---
 
-## 📋 **File Management Strategy**
+## 📦 **Package Installation**
 
-### **Configuration Management**
-- Environment variables in `.env` (not tracked)
-- Configuration templates provided (.env.example)
-- API keys and secrets properly isolated
-- Python virtual environment for dependencies
+### **Using UV (Recommended)**
+```bash
+# Install UV
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-### **Data Persistence**
-- SQLite database for processing history and duplicate prevention
-- Structured logging with rotation
-- File cleanup tracking and management tools
-- Development history in CLAUDE_LOG.md
+# Create virtual environment
+uv venv
+
+# Activate environment
+source .venv/bin/activate
+
+# Install package with all dependencies
+uv pip install -e ".[dev,mcp,all]"
+```
+
+### **Using pip (Legacy)**
+```bash
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install package
+pip install -e ".[dev]"
+```
+
+---
+
+## 🧪 **Running Tests**
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test suites
+pytest tests/unit/
+pytest tests/integration/
+pytest tests/e2e/
+
+# Run with coverage
+pytest --cov=voice_task_manager
+
+# Run specific test file
+pytest tests/unit/test_adapters.py -v
+```
 
 ---
 
 ## 🚀 **Quick Navigation**
 
-1. **New to the project?** → Start with [README.md](../README.md)
-2. **Setting up?** → Check [Feature Specification](FEATURE_SPECIFICATION.md)
-3. **Understanding scripts?** → See [scripts/README.md](../scripts/README.md)
-4. **File cleanup?** → Read [File Cleanup Guide](guides/file-cleanup-guide.md)
-5. **System monitoring?** → Use `./scripts/voice-status.sh`
+1. **New to the project?** → Start with [README.md](../../README.md)
+2. **Understanding the code?** → Check module docstrings in `src/`
+3. **Running tests?** → See test files in `tests/`
+4. **Need API docs?** → Read [API Reference](../reference/api_reference.md)
+5. **System monitoring?** → Check logs in `logs/`
 
 ---
 
-## 🔮 **Next Steps**
+## 🔧 **Development Guidelines**
 
-### **Planned Improvements**
-1. **Phase 1**: Google Drive API integration for automated file cleanup
-2. **Phase 2**: Enhanced context analysis for intelligent categorization
-3. **Phase 3**: Real-time processing with webhook triggers
-4. **Phase 4**: Web dashboard for monitoring and control
+### **Code Organization**
+- Keep related functionality in appropriate modules
+- Use clear, descriptive names
+- Follow PEP 8 style guidelines
+- Add comprehensive docstrings
+
+### **Testing Requirements**
+- Write tests for new features
+- Maintain test coverage above 80%
+- Use mocks for external services
+- Include both positive and negative test cases
+
+### **Documentation Standards**
+- Update docs when changing functionality
+- Keep README files current
+- Document breaking changes
+- Include code examples
 
 ---
 
-*This structure reflects the current Python-based automation system, optimized for simplicity and reliability.*
+## 🔮 **Architecture Highlights**
+
+### **Modular Design**
+- Clear separation between core logic and integrations
+- Pluggable adapter system for storage backends
+- Isolated external service clients
+- Reusable utility functions
+
+### **Error Handling**
+- Comprehensive exception handling
+- Graceful degradation for service failures
+- Detailed logging for debugging
+- User-friendly error messages
+
+### **Performance Optimization**
+- Efficient database queries
+- Batch processing capabilities
+- Caching where appropriate
+- Async operations for I/O
+
+---
+
+*This structure reflects the current state of the Voice Task Management system as a modern Python package with professional architecture and comprehensive testing.*

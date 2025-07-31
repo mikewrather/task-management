@@ -9,10 +9,10 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timedelta
 
-from src.voice_task_manager.core.processor import VoiceProcessor
-from src.voice_task_manager.utils.database import VoiceDatabase
-from src.voice_task_manager.core.analyzer import VoiceAnalyzer
-from src.voice_task_manager.utils.notifications import VoiceNotificationSystem
+from voice_task_manager.core.processor import VoiceProcessor
+from voice_task_manager.utils.database import VoiceDatabase
+from voice_task_manager.core.analyzer import VoiceAnalyzer
+from voice_task_manager.utils.notifications import VoiceNotificationSystem
 
 
 class TestSystemScenarios:
@@ -264,7 +264,7 @@ class TestSystemScenarios:
         database = VoiceDatabase(temp_project_root)
         
         # Pre-populate with partially processed files from "previous session"
-        from src.voice_task_manager.models.voice_file import VoiceFile
+        from voice_task_manager.models.voice_file import VoiceFile
         
         # Completed file
         completed_file = VoiceFile(
@@ -393,7 +393,7 @@ class TestSystemScenarios:
         analyzer = VoiceAnalyzer(temp_project_root)
         
         # Simulate processing history over several days
-        from src.voice_task_manager.models.voice_file import VoiceFile
+        from voice_task_manager.models.voice_file import VoiceFile
         
         base_time = datetime.now() - timedelta(days=7)
         
@@ -649,7 +649,7 @@ class TestSystemScenarios:
     def test_configuration_and_setup_scenario(self, temp_project_root):
         """Test complete system setup and configuration scenario"""
         
-        from src.voice_task_manager.utils.config import SystemSetup, SystemStatus
+        from voice_task_manager.utils.config import SystemSetup, SystemStatus
         
         # Initialize setup system
         setup_system = SystemSetup(temp_project_root)

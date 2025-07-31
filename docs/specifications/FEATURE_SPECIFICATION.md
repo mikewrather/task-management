@@ -63,8 +63,6 @@ Notion PARA Database
 - **Cron Scheduling**: Runs every 5 minutes automatically
 - **Desktop Notifications**: Immediate popup when files processed
 - **Comprehensive Logging**: File and console logging with timestamps
-- **Status Monitoring**: System health checks and processing statistics
-- **Analytics Tools**: Processing trends and cleanup recommendations
 
 ### **3. Configuration & Management**
 - **Environment Configuration**: `.env` file-based API key management
@@ -236,12 +234,6 @@ NOTIFICATION_EMAIL=your-email@gmail.com
 
 ### **Monitoring Commands**
 ```bash
-# System Status
-./scripts/voice-status.sh
-
-# Processing Statistics
-./scripts/analyze-voice-runs.py --stats
-
 # Live Logs  
 tail -f logs/voice-automation.log
 
@@ -273,13 +265,11 @@ tail -f logs/voice-automation.log
 ## 📋 **Operational Procedures**
 
 ### **Daily Operations**
-- Monitor `./scripts/analyze-voice-runs.py --stats` for processing statistics
 - Check logs if processing seems delayed
 - Verify Notion tasks are appearing correctly
 - Review `./scripts/cleanup-processed-files.py --stats` for storage management
 
 ### **Weekly Maintenance**
-- Review `./scripts/voice-status.sh` for system health
 - Clean up processed voice files using `./scripts/cleanup-processed-files.py --guide`
 - Clean up old log files if disk space needed
 - Update backup retention as needed

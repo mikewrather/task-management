@@ -10,10 +10,10 @@ import json
 import time
 from datetime import datetime
 
-from src.voice_task_manager.core.processor import VoiceProcessor
-from src.voice_task_manager.utils.database import VoiceDatabase
-from src.voice_task_manager.models.voice_file import VoiceFile
-from src.voice_task_manager.models.task import NotionTask
+from voice_task_manager.core.processor import VoiceProcessor
+from voice_task_manager.utils.database import VoiceDatabase
+from voice_task_manager.models.voice_file import VoiceFile
+from voice_task_manager.models.task import NotionTask
 
 
 class TestCompleteWorkflow:
@@ -368,7 +368,7 @@ class TestCompleteWorkflow:
     def test_system_health_monitoring_workflow(self, voice_processor, temp_project_root):
         """Test system health monitoring during processing"""
         
-        from src.voice_task_manager.utils.config import SystemStatus
+        from voice_task_manager.utils.config import SystemStatus
         
         # Initialize system status checker
         status_checker = SystemStatus(temp_project_root)
@@ -479,7 +479,7 @@ class TestCompleteWorkflow:
     def test_cleanup_workflow_integration(self, voice_processor, temp_project_root):
         """Test cleanup operations integration with main workflow"""
         
-        from src.voice_task_manager.core.cleanup import VoiceCleanup
+        from voice_task_manager.core.cleanup import VoiceCleanup
         
         # Create some test files to cleanup
         temp_dir = temp_project_root / 'temp'
@@ -527,7 +527,7 @@ class TestCompleteWorkflow:
     def test_configuration_workflow_integration(self, voice_processor, temp_project_root):
         """Test configuration system integration with workflow"""
         
-        from src.voice_task_manager.utils.config import SystemSetup
+        from voice_task_manager.utils.config import SystemSetup
         
         # Initialize setup system
         setup_system = SystemSetup(temp_project_root)

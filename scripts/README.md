@@ -1,232 +1,199 @@
 # Scripts Directory
 
-This directory contains automation scripts and utilities for the voice task management system.
+This directory contains utility scripts organized by function for the Voice Task Management system.
 
-## 🔧 **Core Scripts**
-
-### **Voice Processing**
-- **`automated-voice-processor.py`** - Main automation script for cron execution
-  - Scans Google Drive, transcribes audio, creates Notion tasks
-  - Comprehensive logging and error handling
-  - Usage: `python automated-voice-processor.py`
-
-- **`voice-cron-wrapper.sh`** - Cron-compatible wrapper script
-  - Sets up environment and executes automation
-  - Auto-generated during cron installation
-  - Usage: `./voice-cron-wrapper.sh`
-
-### **Setup & Configuration**
-- **`setup-voice-cron.sh`** - Interactive cron job installer
-  - Creates wrapper script and installs cron job
-  - Configures 5-minute automation intervals
-  - Usage: `./setup-voice-cron.sh`
-
-### **Monitoring & Analysis**
-- **`analyze-voice-runs.py`** - Log analysis and statistics
-  - View recent runs, comprehensive stats, error summaries
-  - Usage: `./analyze-voice-runs.py [--stats|--today|--errors]`
-
-- **`voice-status.sh`** - Quick system status dashboard
-  - Shows cron status, recent activity, system health
-  - Usage: `./voice-status.sh`
-
-### **File Management**
-- **`cleanup-processed-files.py`** - Processed files cleanup manager
-  - Track and manage processed voice files
-  - Manual cleanup guidance and statistics
-  - Usage: `./cleanup-processed-files.py [--list|--guide|--stats]`
-
-### **Notifications**
-- **`notification-system.py`** - Desktop notification handler
-  - Sends popup notifications when files are processed
-  - Optional email notifications (SMTP configuration required)
-  - Auto-invoked by main automation script
-
-## 📊 **Logging System**
-
-### **Core Logging Module**
-- **`voice_logging.py`** - Centralized logging class
-  - Structured logging with context data
-  - Multiple log levels (debug, info, warning, error, success)
-  - JSON-formatted run summaries for analysis
-  - Automatic log rotation and maintenance
-
-### **Log Files Generated**
-- **`logs/voice-automation.log`** - Detailed processing logs
-- **`logs/cron-run-history.log`** - JSON run summaries
-- **`logs/voice-errors.log`** - Dedicated error tracking
-
-## 🚀 **Quick Start**
-
-### **Initial Setup**
-```bash
-# Install cron automation
-./scripts/setup-voice-cron.sh
-
-# Check system status
-./scripts/voice-status.sh
-
-# View recent activity
-./scripts/analyze-voice-runs.py
-```
-
-### **Manual Testing**
-```bash
-# Test voice processing manually
-source venv/bin/activate
-python scripts/automated-voice-processor.py
-
-# View comprehensive statistics
-./scripts/analyze-voice-runs.py --stats
-
-# Monitor logs in real-time
-tail -f logs/voice-automation.log
-```
-
-### **Monitoring Commands**
-```bash
-# System health overview
-./scripts/analyze-voice-runs.py --stats
-
-# Today's activity
-./scripts/analyze-voice-runs.py --today
-
-# Error analysis
-./scripts/analyze-voice-runs.py --errors
-
-# Cron job status
-crontab -l
-
-# File cleanup management
-./scripts/cleanup-processed-files.py --stats
-```
-
-## 📁 **Directory Structure**
+## 📁 Directory Structure
 
 ```
 scripts/
-├── automated-voice-processor.py    # Main automation script
-├── voice_logging.py                # Centralized logging system
-├── analyze-voice-runs.py           # Log analysis tool
-├── setup-voice-cron.sh            # Cron installation
-├── voice-cron-wrapper.sh          # Auto-generated cron wrapper
-├── voice-status.sh                 # Status dashboard
-├── notification-system.py         # Desktop notifications
-├── archive/                        # Historical/completed scripts
-├── setup/                          # One-time setup utilities
-├── testing/                        # Development test scripts
-├── utilities/                      # General maintenance tools
-└── README.md                       # This documentation
+├── debug/                  # Debugging and verification utilities
+├── analysis/              # Log and performance analysis tools
+├── maintenance/           # System maintenance and cleanup scripts
+└── legacy/                # Legacy scripts (to be migrated/removed)
 ```
 
-## 🔧 **Configuration**
+## 🔍 Debug Scripts
 
-All scripts read configuration from the project `.env` file:
+Scripts for debugging and verifying system functionality:
 
+### Database & Processing
+- **`check_database.py`** - Verify SQLite database integrity and contents
+- **`check_db_content.py`** - Detailed database content inspection
+- **`check_file_tracking.py`** - Verify voice file processing status
+- **`check_graphrag_db.py`** - Check Neo4j/GraphRAG database connectivity
+- **`check_pending_files.py`** - List unprocessed voice files
+- **`check_task_relationships.py`** - Verify task-project-area relationships
+
+### Integration Testing
+- **`test_claude_mcp.py`** - Test Claude MCP integration
+- **`test_claude_subprocess.py`** - Test Claude subprocess execution
+- **`test_graphrag_connection.py`** - Test GraphRAG/Neo4j connectivity
+- **`test_notion_import.py`** - Verify Notion API imports
+- **`test_task_adapter.py`** - Test task adapter implementations
+
+### System Verification
+- **`verify_env.py`** - Verify environment variables and configuration
+- **`verify_imports.py`** - Check all package imports
+- **`debug_claude_processing.py`** - Debug Claude AI processing pipeline
+
+## 📊 Analysis Scripts
+
+Tools for analyzing system performance and logs:
+
+### Log Analysis
+- **`analyze_logs.py`** - Comprehensive log analysis tool
+- **`analyze_processing_errors.py`** - Error pattern analysis
+- **`analyze_voice_runs.py`** - Voice processing run statistics
+
+### Performance Analysis
+- **`performance_test_graphrag.py`** - GraphRAG performance benchmarks
+- **`analyze_adapter_performance.py`** - Adapter performance comparison
+
+## 🛠️ Maintenance Scripts
+
+System maintenance and cleanup utilities:
+
+### Project Maintenance
+- **`check_project_structure.py`** - Verify project follows Python best practices
+- **`fix_test_imports.py`** - Fix test import paths after reorganization
+- **`clean_pycache.py`** - Remove Python cache files
+
+### Cleanup Utilities
+- **`cleanup_debug_files.py`** - Remove temporary debug outputs
+- **`delete_duplicate_notion_tasks.py`** - Remove duplicate Notion entries
+- **`simple_delete_duplicates.py`** - Basic duplicate removal
+
+## 🔧 Usage Examples
+
+### Debug Database Issues
 ```bash
-# Required for voice processing
-OPENAI_API_KEY=sk-proj-...
-NOTION_TOKEN=ntn_...
-NOTION_TASKS_DB=183267fb-...
-GOOGLE_DRIVE_FOLDER_ID=1vUNQV617t5mXHtyYrGro6Q3K-6JCmuUj
+# Check database content
+python scripts/debug/check_database.py
 
-# File cleanup configuration
-CLEANUP_PROCESSED_FILES=false  # Enable cleanup tracking
-CLEANUP_DELAY_HOURS=24         # Hours before cleanup eligible
+# Verify pending files
+python scripts/debug/check_pending_files.py
 
-# Optional for notifications
-SMTP_SERVER=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
-NOTIFICATION_EMAIL=your-email@gmail.com
+# Check GraphRAG connectivity
+python scripts/debug/check_graphrag_db.py
 ```
 
-## 🚨 **Troubleshooting**
-
-### **Common Issues**
-
-**Cron not running**:
+### Analyze System Performance
 ```bash
-# Check cron service
-sudo systemctl status cron
+# Analyze recent processing runs
+python scripts/analysis/analyze_voice_runs.py --recent 10
 
-# Verify cron job exists
-crontab -l
+# Check for error patterns
+python scripts/analysis/analyze_processing_errors.py
+
+# Benchmark GraphRAG performance
+python scripts/analysis/performance_test_graphrag.py
 ```
 
-**Environment variables not loaded**:
+### Maintain System Health
 ```bash
-# Verify .env file exists and has correct format
-cat .env
+# Verify project structure
+python scripts/maintenance/check_project_structure.py
 
-# Test manual execution
-source venv/bin/activate
-python scripts/automated-voice-processor.py
+# Clean Python cache
+python scripts/maintenance/clean_pycache.py
+
+# Remove duplicate tasks
+python scripts/maintenance/delete_duplicate_notion_tasks.py --dry-run
 ```
 
-**No files detected**:
+## 🚀 Quick Reference
+
+### Common Debugging Tasks
+
+**Voice file not processing?**
 ```bash
-# Check Google Drive folder accessibility
-# Ensure files are publicly shared
-# Verify GOOGLE_DRIVE_FOLDER_ID in .env
+python scripts/debug/check_pending_files.py
+python scripts/debug/check_file_tracking.py <file_id>
 ```
 
-### **Log Analysis**
+**Task relationships missing?**
 ```bash
-# Recent errors
-./scripts/analyze-voice-runs.py --errors
-
-# System health check
-./scripts/analyze-voice-runs.py --stats | grep "System Health"
-
-# Detailed error investigation
-tail logs/voice-errors.log | jq .
+python scripts/debug/check_task_relationships.py
+python scripts/debug/check_graphrag_db.py
 ```
 
-## 📚 **Development**
+**Import errors?**
+```bash
+python scripts/debug/verify_imports.py
+python scripts/maintenance/fix_test_imports.py
+```
 
-### **Adding New Scripts**
-1. Follow existing patterns in `automated-voice-processor.py`
-2. Use the centralized `VoiceLogger` class
-3. Include comprehensive error handling
-4. Add documentation to this README
+### Performance Issues
 
-### **Logging Best Practices**
+**Slow processing?**
+```bash
+python scripts/analysis/analyze_adapter_performance.py
+python scripts/analysis/performance_test_graphrag.py
+```
+
+**High error rate?**
+```bash
+python scripts/analysis/analyze_processing_errors.py
+python scripts/analysis/analyze_voice_runs.py --errors
+```
+
+## 📝 Script Guidelines
+
+When creating new scripts:
+
+1. **Organization** - Place in appropriate subdirectory
+2. **Naming** - Use descriptive names with underscore separation
+3. **Documentation** - Include docstring with purpose and usage
+4. **Imports** - Use absolute imports from `voice_task_manager`
+5. **Error Handling** - Include proper exception handling
+6. **Logging** - Use the project's logging configuration
+
+Example template:
 ```python
-from voice_logging import VoiceLogger
+#!/usr/bin/env python3
+"""
+Script purpose and description.
 
-logger = VoiceLogger()
-logger.start_run()
+Usage:
+    python scripts/category/script_name.py [options]
+"""
 
-# Provide rich context
-logger.info("Processing file", file_id=file_id, size_bytes=1024)
+import sys
+from pathlib import Path
 
-# Always log run summaries
-logger.log_run_summary(files_found=5, files_processed=3)
+# Add project root to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from voice_task_manager.utils.logging import setup_logging
+
+logger = setup_logging()
+
+def main():
+    """Main script logic."""
+    try:
+        # Script implementation
+        pass
+    except Exception as e:
+        logger.error(f"Script failed: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
 ```
 
-### **Testing Scripts**
-```bash
-# Test individual components
-python -m pytest scripts/test_*.py
+## 🔄 Migration Status
 
-# Validate logging format
-python scripts/analyze-voice-runs.py --last 1
+### Completed Migrations
+- ✅ Moved all debug scripts to `debug/`
+- ✅ Moved analysis scripts to `analysis/`
+- ✅ Moved maintenance scripts to `maintenance/`
+- ✅ Updated imports to use package structure
 
-# Check script permissions
-ls -la scripts/*.sh
-```
-
-## 🗄️ **Legacy & Maintenance Scripts**
-
-The following scripts are available for system maintenance but are not part of the core voice processing workflow:
-
-- **Repository Management**: `organize-repo.sh`, `consolidate-docs.sh`
-- **Windmill Management**: `backup-restore-windmill.sh`, `start-windmill-with-restore.sh`
-- **Development Tools**: Various utilities in `archive/`, `testing/`, and `utilities/` subdirectories
+### Pending Migrations
+- ⏳ Legacy shell scripts in `legacy/`
+- ⏳ Consolidate duplicate functionality
+- ⏳ Convert shell scripts to Python where appropriate
 
 ---
 
-**Last Updated**: 2025-07-24  
-**Documentation**: See `/docs/LOGGING_SYSTEM.md` for comprehensive logging details
+*Updated: 2025-07-31 - Reflects current organized script structure*

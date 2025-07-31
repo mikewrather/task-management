@@ -2,7 +2,6 @@
 
 from typing import Optional, List, Dict, Any
 from ..integrations.notion import NotionClient
-from ..models.voice_file import VoiceFile
 from ..utils.logging import VoiceLogger
 from .base import TaskAdapter, TaskData
 
@@ -24,12 +23,6 @@ class NotionTaskAdapter(TaskAdapter):
     
     def create_task(self, task_data: TaskData) -> Optional[str]:
         """Create a task in Notion"""
-        # Create a temporary VoiceFile for compatibility
-        voice_file = VoiceFile(
-            file_id=f"voice_{task_data.created_at.timestamp()}",
-            filename="voice_task.m4a"
-        )
-        
         # Build task with relationships
         task_properties = {
             "parent": {"database_id": self.client.database_id},

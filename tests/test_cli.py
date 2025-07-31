@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch, MagicMock
 from click.testing import CliRunner
 import json
 
-from src.voice_task_manager.cli import main, status, analyze, setup, cleanup, test, process
+from voice_task_manager.cli import main, status, analyze, setup, cleanup, process
 
 
 class TestCLICommands:

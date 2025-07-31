@@ -275,23 +275,78 @@ class GoogleDriveClient:
                 management_tool="vtm cleanup command"
             )
             
-            # Current implementation: Track cleanup intent in logs
-            # This enables the cleanup management tools to provide guidance
+            # Current implementation: Move local downloaded files
             cleanup_timestamp = voice_file.processed_at or voice_file.discovered_at
             
+            # Check if we have a local recordings directory
+            import pathlib
+            recordings_dir = pathlib.Path.home() / "recordings"
+            processed_dir = recordings_dir / "processed"
+            
+            if recordings_dir.exists() and cleanup_method == 'move':
+                # Create processed directory if it doesn't exist
+                processed_dir.mkdir(exist_ok=True)
+                
+                # Look for the audio file in recordings directory
+                # Try to find file by partial match (file_id might be in the filename)
+                potential_files = []
+                for file in recordings_dir.glob("*.m4a"):
+                    if voice_file.file_id in str(file):
+                        potential_files.append(file)
+                
+                # Also check for files by timestamp if available
+                if voice_file.discovered_at:
+                    timestamp_str = voice_file.discovered_at.strftime("%Y-%m-%d")
+                    for file in recordings_dir.glob(f"*{timestamp_str}*.m4a"):
+                        if file not in potential_files:
+                            potential_files.append(file)
+                
+                # Move the files
+                moved_files = []
+                for file in potential_files:
+                    try:
+                        new_path = processed_dir / file.name
+                        # Add timestamp prefix if not already present
+                        if not new_path.name.startswith("PROCESSED_"):
+                            timestamp_prefix = cleanup_timestamp.strftime("%Y%m%d_%H%M%S")
+                            new_path = processed_dir / f"PROCESSED_{timestamp_prefix}_{file.name}"
+                        
+                        # Move the file
+                        import shutil
+                        shutil.move(str(file), str(new_path))
+                        moved_files.append(new_path.name)
+                        
+                        self.logger.info(
+                            f"✅ Moved file to processed folder",
+                            original_file=file.name,
+                            new_location=new_path.name
+                        )
+                    except Exception as e:
+                        self.logger.warning(
+                            f"Failed to move file {file.name}",
+                            exception=e
+                        )
+                
+                if moved_files:
+                    self.logger.success(
+                        f"🧹 Cleanup completed - moved {len(moved_files)} file(s)",
+                        file_id=voice_file.file_id,
+                        files=moved_files
+                    )
+                else:
+                    self.logger.debug(
+                        "No local files found to move",
+                        file_id=voice_file.file_id,
+                        recordings_dir=str(recordings_dir)
+                    )
+            
+            # Always track in logs for reference
             self.logger.debug(
                 "File marked for cleanup tracking",
                 file_id=voice_file.file_id,
                 cleanup_timestamp=cleanup_timestamp.isoformat(),
                 google_drive_url=voice_file.google_drive_url
             )
-            
-            # Future implementation placeholder:
-            # When Google Drive API is integrated, this will:
-            # 1. Authenticate with Google Drive API
-            # 2. Rename file to "PROCESSED_{timestamp}_{original_name}"
-            # 3. Or move file to "processed" subfolder
-            # 4. Update file permissions if needed
             
             return True
             
