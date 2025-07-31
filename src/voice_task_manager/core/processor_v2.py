@@ -335,60 +335,80 @@ class VoiceProcessorV2:
             duration = transcription_result.get('duration', 0)
             
             # Step 4: Process with Claude if enabled
+            tasks_to_create = []
             if self.use_claude_processor:
-                task_data = self.claude_processor.process_transcript(
+                task_data_list = self.claude_processor.process_transcript(
                     transcript_text, 
                     voice_file.file_id
                 )
-                if not task_data:
+                if not task_data_list:
                     # Fallback to basic processing
-                    task_data = self._create_basic_task_data(transcript_text)
+                    tasks_to_create = [self._create_basic_task_data(transcript_text)]
+                else:
+                    tasks_to_create = task_data_list
             else:
-                task_data = self._create_basic_task_data(transcript_text)
+                tasks_to_create = [self._create_basic_task_data(transcript_text)]
             
             # Step 5: Create tasks in all configured adapters
-            created_tasks = []
-            for adapter in self.adapters:
-                try:
-                    task_id = adapter.create_task(task_data)
-                    if task_id:
-                        created_tasks.append({
-                            'adapter': type(adapter).__name__,
-                            'task_id': task_id
-                        })
-                        self.logger.success(
-                            f"Task created in {type(adapter).__name__}",
-                            task_id=task_id
+            all_created_tasks = []
+            for task_data in tasks_to_create:
+                created_tasks = []
+                for adapter in self.adapters:
+                    try:
+                        task_id = adapter.create_task(task_data)
+                        if task_id:
+                            created_tasks.append({
+                                'adapter': type(adapter).__name__,
+                                'task_id': task_id
+                            })
+                            self.logger.success(
+                                f"Task '{task_data.name}' created in {type(adapter).__name__}",
+                                task_id=task_id
+                            )
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to create task '{task_data.name}' in {type(adapter).__name__}",
+                            exception=e
                         )
-                except Exception as e:
-                    self.logger.error(
-                        f"Failed to create task in {type(adapter).__name__}",
-                        exception=e
-                    )
+                
+                if created_tasks:
+                    all_created_tasks.extend(created_tasks)
             
-            if not created_tasks:
-                voice_file.mark_failed("Failed to create task in any adapter")
+            if not all_created_tasks:
+                voice_file.mark_failed("Failed to create any tasks in any adapter")
                 self.database.save_voice_file(voice_file)
                 return None
             
             # Step 6: Mark as completed and save
-            # Use first task URL for compatibility
-            task_url = created_tasks[0].get('task_url', 'Multiple adapters')
+            # For multiple tasks, use a summary URL or first task URL
+            if len(tasks_to_create) > 1:
+                task_url = f"Created {len(tasks_to_create)} tasks"
+            else:
+                # Try to get URL from first created task
+                task_url = all_created_tasks[0].get('task_url', 'Multiple adapters') if all_created_tasks else 'Multiple adapters'
+            
             voice_file.mark_completed(transcript_text, task_url, duration)
             self.database.save_voice_file(voice_file)
             
-            self.logger.success("File processing completed successfully", file_id=voice_file.file_id)
+            self.logger.success(
+                f"File processing completed successfully: {len(tasks_to_create)} tasks created", 
+                file_id=voice_file.file_id
+            )
             
+            # Return info about all created tasks
             return {
                 'file_id': voice_file.file_id,
                 'transcript': transcript_text,
-                'created_tasks': created_tasks,
-                'task_data': {
-                    'name': task_data.name,
-                    'project': task_data.project_name,
-                    'area': task_data.area_name,
-                    'priority': task_data.priority
-                },
+                'created_tasks': all_created_tasks,
+                'tasks_created': len(tasks_to_create),
+                'task_summaries': [
+                    {
+                        'name': task.name,
+                        'project': task.project_name,
+                        'area': task.area_name,
+                        'priority': task.priority
+                    } for task in tasks_to_create
+                ],
                 'duration': duration,
                 'transcript_length': len(transcript_text),
                 'word_count': transcription_result.get('word_count', 0),

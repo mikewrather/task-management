@@ -25,7 +25,7 @@ class ClaudeVoiceProcessor:
         self.logger = logger or VoiceLogger()
         self.claude_project = "task-management"
     
-    def process_transcript(self, transcript: str, voice_file_id: str) -> Optional[TaskData]:
+    def process_transcript(self, transcript: str, voice_file_id: str) -> List[TaskData]:
         """
         Process voice transcript with intelligent categorization
         
@@ -34,7 +34,7 @@ class ClaudeVoiceProcessor:
             voice_file_id: ID of the source voice file
             
         Returns:
-            TaskData with proper categorization, or None if failed
+            List of TaskData objects with proper categorization
         """
         self.logger.info(f"Processing transcript with Claude: {transcript[:100]}...")
         
@@ -50,53 +50,66 @@ class ClaudeVoiceProcessor:
             
             if not result.get("success"):
                 self.logger.error(f"Claude processing failed: {result.get('error')}")
-                return None
+                return []
             
-            # Parse the structured response
-            task_info = result.get("task_data", {})
+            # Parse the tasks array from response
+            tasks_data = result.get("tasks", [])
+            overall_reasoning = result.get("overall_reasoning", "")
             
-            # Create TaskData object
-            task_data = TaskData(
-                name=task_info.get("name", f"Voice Note: {transcript[:60]}..."),
-                description=task_info.get("description", transcript),
-                status=task_info.get("status", "Inbox"),
-                priority=task_info.get("priority", "Medium"),
-                contexts=task_info.get("contexts", ["voice", "auto-processed"]),
-                project_id=task_info.get("project_id"),
-                project_name=task_info.get("project_name"),
-                area_id=task_info.get("area_id"),
-                area_name=task_info.get("area_name"),
-                goal_id=task_info.get("goal_id"),
-                goal_name=task_info.get("goal_name"),
-                source="voice",
-                metadata={
-                    "voice_file_id": voice_file_id,
-                    "claude_confidence": task_info.get("confidence", 0),
-                    "reasoning": task_info.get("reasoning", ""),
-                    "additional_tasks": task_info.get("additional_tasks", [])
-                }
-            )
+            if not tasks_data:
+                # Fallback: create a single task if no tasks returned
+                self.logger.warning("No tasks returned by Claude, creating fallback task")
+                return [TaskData(
+                    name=f"Voice Note: {transcript[:60]}...",
+                    description=transcript,
+                    status="Inbox",
+                    priority="Medium",
+                    contexts=["voice", "auto-processed"],
+                    source="voice",
+                    metadata={"voice_file_id": voice_file_id}
+                )]
             
-            self.logger.success(
-                f"Task categorized: Project={task_data.project_name}, "
-                f"Area={task_data.area_name}, Priority={task_data.priority}"
-            )
+            # Create TaskData objects for each task
+            created_tasks = []
+            for i, task_info in enumerate(tasks_data):
+                task_data = TaskData(
+                    name=task_info.get("name", f"Voice Task {i+1}: {transcript[:50]}..."),
+                    description=task_info.get("description", transcript),
+                    status=task_info.get("status", "Inbox"),
+                    priority=task_info.get("priority", "Medium"),
+                    contexts=task_info.get("contexts", ["voice", "auto-processed"]),
+                    project_id=task_info.get("project_id"),
+                    project_name=task_info.get("project_name"),
+                    area_id=task_info.get("area_id"),
+                    area_name=task_info.get("area_name"),
+                    goal_id=task_info.get("goal_id"),
+                    goal_name=task_info.get("goal_name"),
+                    source="voice",
+                    metadata={
+                        "voice_file_id": voice_file_id,
+                        "claude_confidence": task_info.get("confidence", 0),
+                        "reasoning": task_info.get("reasoning", ""),
+                        "task_number": i + 1,
+                        "total_tasks": len(tasks_data),
+                        "overall_reasoning": overall_reasoning
+                    }
+                )
+                
+                created_tasks.append(task_data)
+                
+                self.logger.success(
+                    f"Task {i+1}/{len(tasks_data)} categorized: '{task_data.name}' "
+                    f"Project={task_data.project_name}, Area={task_data.area_name}"
+                )
             
-            # Log if additional tasks were mentioned
-            additional_tasks = task_info.get("additional_tasks", [])
-            if additional_tasks and len(additional_tasks) > 0:
-                # Filter out example entries
-                real_additional_tasks = [t for t in additional_tasks if not t.startswith("List any") and not t.startswith("E.g.,")]
-                if real_additional_tasks:
-                    self.logger.info(
-                        f"📝 Additional tasks mentioned ({len(real_additional_tasks)}): {', '.join(real_additional_tasks[:3])}"
-                    )
+            if len(created_tasks) > 1:
+                self.logger.info(f"✨ Created {len(created_tasks)} tasks from single voice note")
             
-            return task_data
+            return created_tasks
             
         except Exception as e:
             self.logger.error(f"Error in Claude processing: {e}")
-            return None
+            return []
     
     def _build_categorization_prompt(self, transcript: str, context: Dict[str, Any]) -> str:
         """Build Claude prompt with full context"""
@@ -146,17 +159,19 @@ Voice transcript: "{transcript}"
 IMPORTANT: ANALYZE THE TRANSCRIPT STRUCTURE FIRST:
 
 1. **Single vs Multiple Tasks**:
-   - If the transcript contains multiple distinct tasks (e.g., "I need to do X. Also, Y. And don't forget Z"), you should focus on the FIRST task only
-   - Return a clear, actionable task name, NOT the entire transcript
+   - If the transcript contains multiple distinct tasks (e.g., "I need to do X. Also, Y. And don't forget Z"), you should extract ALL of them
+   - Return an array of tasks, each with its own categorization
+   - Each task should have a clear, actionable name
    - Examples:
-     - Bad: "I just thought of a couple things for sleep worlds..."
-     - Good: "Set up Android emulator for Adapty migration testing"
+     - Transcript: "I need to call the plumber and schedule dentist appointment"
+     - Returns: Two tasks: "Call plumber" and "Schedule dentist appointment"
 
 2. **Task Extraction Guidelines**:
-   - Extract the core action from conversational language
+   - Extract EVERY distinct action from the transcript
    - Create succinct, actionable task names (verb + object)
-   - Put additional context in the description, not the title
-   - If multiple tasks are mentioned, note in reasoning that additional tasks were mentioned
+   - Each task gets its own project/area assignment
+   - Tasks can share the same project/area if appropriate
+   - Put context specific to each task in its description
 
 CRITICAL INSTRUCTIONS FOR RELATIONSHIP DISCOVERY:
 
@@ -194,38 +209,69 @@ SEARCH STRATEGY:
 EXAMPLES OF GOOD TASK EXTRACTION:
 
 Transcript: "I just thought of a couple things for sleep worlds. I need to figure out if I can get the emulator set up for android to automate the testing of the adapty migration. Also, I need to make sure that I'm forwarding events from adapty to revenuecat until we cut over"
-Good Task Name: "Set up Android emulator for Adapty migration testing"
-Description: "Configure Android emulator to automate testing of the Adapty migration in Sleep Worlds. Note: Also need to forward events from Adapty to RevenueCat until cutover."
-Project: Search for "Adapty Migration" project
-Area: "Sleep Worlds" or "[Sleep Worlds] Android"
+Returns TWO tasks:
+Task 1: "Set up Android emulator for Adapty migration testing"
+Description: "Configure Android emulator to automate testing of the Adapty migration in Sleep Worlds"
+Project: "Adapty Migration" 
+Area: "Sleep Worlds"
+
+Task 2: "Forward events from Adapty to RevenueCat until cutover"
+Description: "Ensure event forwarding is configured between Adapty and RevenueCat during migration period"
+Project: "Adapty Migration"
+Area: "Sleep Worlds"
 
 Transcript: "For the house, I need to call the plumber about the kitchen sink and also get quotes for the new fence"
-Good Task Name: "Call plumber about kitchen sink"
-Description: "Kitchen sink issue needs plumber attention. Note: Also need to get fence quotes."
-Project: Search for home maintenance projects
+Returns TWO tasks:
+Task 1: "Call plumber about kitchen sink"
+Description: "Kitchen sink issue needs plumber attention"
+Project: "Home Maintenance"
+Area: "House"
+
+Task 2: "Get quotes for new fence"
+Description: "Research and collect quotes for fence replacement/installation"
+Project: "Home Improvement" 
 Area: "House"
 
 Return a JSON response:
 {{
     "success": true,
-    "task_data": {{
-        "name": "Clear, actionable task name",
-        "description": "Full transcript or enhanced description",
-        "status": "Inbox",
-        "priority": "Low|Medium|High|Urgent",
-        "contexts": ["voice", "auto-processed", "any-other-contexts"],
-        "project_id": "notion_id if found",
-        "project_name": "Project name if found",
-        "area_id": "notion_id if found",
-        "area_name": "Area name if found",
-        "confidence": 0.0-1.0,
-        "reasoning": "Explain: 1) What searches you performed, 2) Why you chose this project/area, 3) If multiple tasks were mentioned, list them, 4) Any assumptions made",
-        "additional_tasks": [
-            "List any other tasks mentioned in the transcript that should be created separately",
-            "E.g., 'Forward events from Adapty to RevenueCat until cutover'"
-        ]
-    }}
+    "tasks": [
+        {{
+            "name": "Clear, actionable task name for first task",
+            "description": "Detailed description for this specific task",
+            "status": "Inbox",
+            "priority": "Low|Medium|High|Urgent",
+            "contexts": ["voice", "auto-processed", "@location", "@tool"],
+            "project_id": "notion_id if found",
+            "project_name": "Project name if found",
+            "area_id": "notion_id if found", 
+            "area_name": "Area name if found",
+            "confidence": 0.0-1.0,
+            "reasoning": "Why this categorization was chosen for this task"
+        }},
+        {{
+            "name": "Clear, actionable task name for second task (if exists)",
+            "description": "Detailed description for this specific task",
+            "status": "Inbox",
+            "priority": "Low|Medium|High|Urgent",
+            "contexts": ["voice", "auto-processed", "@location", "@tool"],
+            "project_id": "notion_id if found",
+            "project_name": "Project name if found", 
+            "area_id": "notion_id if found",
+            "area_name": "Area name if found",
+            "confidence": 0.0-1.0,
+            "reasoning": "Why this categorization was chosen for this task"
+        }}
+        // ... more tasks as needed
+    ],
+    "overall_reasoning": "Explain: 1) What searches you performed, 2) How many tasks were found, 3) Any shared context between tasks, 4) Any assumptions made"
 }}
+
+IMPORTANT: 
+- Always return an array in "tasks", even if there's only one task
+- Each task should be independently actionable
+- Tasks can share projects/areas when appropriate
+- Extract ALL distinct tasks from the transcript
 
 REMEMBER: Your goal is to create a well-connected knowledge graph. Every task should have meaningful relationships whenever possible."""
         
@@ -284,16 +330,29 @@ Remember to:
             
             # Extract JSON (Claude might include tool use output)
             import re
-            json_match = re.search(r'\{.*"success".*\}', output, re.DOTALL)
+            # Look for JSON with either "success" or "tasks" key
+            json_match = re.search(r'\{.*(?:"success"|"tasks").*\}', output, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
-            else:
-                # Fallback: try to parse the whole output
                 try:
-                    return json.loads(output)
+                    return json.loads(json_match.group())
+                except json.JSONDecodeError:
+                    self.logger.error(f"Invalid JSON in match: {json_match.group()[:200]}")
+                    
+            # Fallback: try to parse the whole output
+            try:
+                return json.loads(output)
+            except:
+                # Try to extract JSON from Claude's response format
+                try:
+                    # Claude might wrap in ```json blocks
+                    json_block_match = re.search(r'```json\s*(.*?)\s*```', output, re.DOTALL)
+                    if json_block_match:
+                        return json.loads(json_block_match.group(1))
                 except:
-                    self.logger.error(f"Failed to parse Claude response: {output[:500]}")
-                    return {"success": False, "error": "Invalid JSON response"}
+                    pass
+                    
+                self.logger.error(f"Failed to parse Claude response: {output[:500]}")
+                return {"success": False, "error": "Invalid JSON response"}
                     
         except subprocess.TimeoutExpired as e:
             self.logger.error(f"Claude execution timed out after 120 seconds")
@@ -315,16 +374,16 @@ Remember to:
             transcripts: List of dicts with 'transcript' and 'file_id' keys
             
         Returns:
-            List of TaskData objects
+            List of TaskData objects (flattened from all transcripts)
         """
-        results = []
+        all_tasks = []
         
         for item in transcripts:
-            task_data = self.process_transcript(
+            tasks = self.process_transcript(
                 item['transcript'], 
                 item.get('file_id', 'unknown')
             )
-            if task_data:
-                results.append(task_data)
+            all_tasks.extend(tasks)
         
-        return results
+        self.logger.info(f"Batch processing complete: {len(all_tasks)} total tasks from {len(transcripts)} transcripts")
+        return all_tasks
