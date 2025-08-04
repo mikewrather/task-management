@@ -477,5 +477,39 @@ except ImportError as e:
     # Query commands not available - this is expected during development
     console.print(f"[dim]Query commands not available: {e}[/dim]")
 
+
+@main.command()
+@click.argument('action', type=click.Choice(['start', 'stop', 'restart', 'status']))
+@click.option('--interval', default=300, help='Processing interval in seconds')
+@click.pass_context
+def service(ctx: click.Context, action: str, interval: int) -> None:
+    """Manage the voice processing service daemon"""
+    import subprocess
+    
+    service_script = Path(__file__).parent.parent.parent / "scripts" / "services" / "voice-processing-service.py"
+    
+    if not service_script.exists():
+        console.print(f"❌ Service script not found at {service_script}", style="red")
+        return
+        
+    cmd = [sys.executable, str(service_script), action]
+    if action in ['start', 'restart']:
+        cmd.extend(['--interval', str(interval)])
+        
+    try:
+        console.print(f"🔧 Running service command: {action}")
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True)
+        
+        if result.stdout:
+            console.print(result.stdout.strip())
+        if result.stderr:
+            console.print(result.stderr.strip(), style="red")
+            
+        sys.exit(result.returncode)
+    except Exception as e:
+        console.print(f"❌ Service command failed: {e}", style="red")
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     main()

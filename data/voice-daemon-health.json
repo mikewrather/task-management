@@ -1,0 +1,19 @@
+{
+  "status": "degraded",
+  "state": "running",
+  "uptime_seconds": 155287,
+  "stats": {
+    "total_runs": 512,
+    "successful_runs": 0,
+    "failed_runs": 1009,
+    "files_processed": 0,
+    "last_run": "2025-08-04T11:36:34.638338",
+    "last_error": "'VoiceProcessorV2' object has no attribute 'run_automation'"
+  },
+  "claude_status": "valid",
+  "config": {
+    "interval_seconds": 300,
+    "claude_enabled": true
+  },
+  "timestamp": "2025-08-04T11:41:34.648524"
+}

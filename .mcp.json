@@ -5,8 +5,8 @@
             "args": [
                 "run",
                 "--directory",
-                "${PROJECT_AGENTS_DIR}",
-                "agent-db-server"
+                "/home/mike/development/project-agents",
+                "project-agents-mcp"
             ],
             "env": {
                 "NEO4J_PASSWORD": "agent-db-password",

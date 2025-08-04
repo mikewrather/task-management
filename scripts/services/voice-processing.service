@@ -1,0 +1,56 @@
+[Unit]
+Description=Voice Task Processing Service
+Documentation=https://github.com/yourusername/task-management
+After=network.target
+
+[Service]
+Type=simple
+User=mike
+Group=mike
+
+# Environment
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:/home/mike/.local/bin:/home/mike/.nvm/versions/node/v24.2.0/bin"
+Environment="HOME=/home/mike"
+Environment="PYTHONUNBUFFERED=1"
+
+# For desktop notifications
+Environment="DISPLAY=:0"
+Environment="DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+
+# Working directory
+WorkingDirectory=/home/mike/development/task-management
+
+# Python virtual environment
+Environment="VIRTUAL_ENV=/home/mike/development/task-management/.venv"
+
+# Start command
+ExecStart=/home/mike/development/task-management/.venv/bin/python scripts/services/voice-processing-service.py start --foreground
+
+# Restart policy
+Restart=on-failure
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Security options (optional but recommended)
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Resource limits (optional)
+# Limit memory to 1GB
+MemoryLimit=1G
+# Limit CPU to 50%
+CPUQuota=50%
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=voice-processing
+
+[Install]
+WantedBy=multi-user.target

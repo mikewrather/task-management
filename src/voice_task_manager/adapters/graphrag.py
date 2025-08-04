@@ -62,10 +62,12 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                     claude_path, 
                     "-p", prompt,
                     "--dangerously-skip-permissions",
+                    "--mcp-debug",  # Add debug flag for better MCP troubleshooting
                     "--output-format", "json"
                 ]
                 
                 self.logger.debug(f"Executing real MCP command: {tool_name}")
+                self.logger.debug(f"Command: {' '.join(cmd)}")
                 
                 # Change to project directory to use its .mcp.json
                 import os
@@ -85,7 +87,9 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                     os.chdir(original_cwd)
                 
                 if result.returncode != 0:
-                    self.logger.error(f"Claude execution failed: {result.stderr}")
+                    self.logger.error(f"Claude execution failed with return code {result.returncode}")
+                    self.logger.error(f"STDERR: {result.stderr}")
+                    self.logger.error(f"STDOUT: {result.stdout}")
                     # Fall back to mock
                     self.logger.warning(f"Falling back to mock for {tool_name}")
                 else:

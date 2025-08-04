@@ -26,6 +26,20 @@ elif [ -n "$(pgrep -U ${USER} dbus-daemon)" ]; then
     export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u ${USER})/bus"
 fi
 
+# Claude authentication setup
+# For Max plan users, Claude uses OAuth credentials stored in ~/.claude/.credentials.json
+# Ensure HOME is set so Claude can find the credentials
+export HOME="/home/mike"
+
+# Optional: Set Anthropic API key if using API authentication instead of Max plan
+# This allows claude -p commands to work without interactive login
+if [ -f "/home/mike/development/task-management/.env" ]; then
+    ANTHROPIC_API_KEY=$(grep '^ANTHROPIC_API_KEY=' /home/mike/development/task-management/.env | cut -d '=' -f2- | tr -d '"' | tr -d "'")
+    if [ -n "$ANTHROPIC_API_KEY" ]; then
+        export ANTHROPIC_API_KEY
+    fi
+fi
+
 # Run the automation using new vtm package
 vtm process >> "/home/mike/development/task-management/logs/cron-voice.log" 2>&1
 

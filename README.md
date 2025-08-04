@@ -164,6 +164,54 @@ task-management/
    python -c "from voice_task_manager.core.processor import VoiceProcessor; print('✅ Setup complete!')"
    ```
 
+## 🔄 Voice Processing Service
+
+The recommended way to run voice processing is using the long-running service daemon, which maintains Claude OAuth sessions and provides better monitoring than cron.
+
+### Service Features
+- **OAuth Session Persistence** - Maintains Claude authentication between runs
+- **Automatic Fallback** - Uses simple parsing when OAuth expires
+- **Health Monitoring** - Real-time status and statistics
+- **Desktop Notifications** - Alerts for important events
+- **Systemd Integration** - Auto-start on boot
+
+### Quick Start
+```bash
+# Start the service
+vtm service start
+
+# Check status
+vtm service status
+
+# Stop when needed
+vtm service stop
+
+# View logs
+tail -f logs/voice-automation.log
+```
+
+### Systemd Installation
+```bash
+# Install as system service
+sudo cp scripts/services/voice-processing.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable voice-processing
+sudo systemctl start voice-processing
+
+# Check service status
+sudo systemctl status voice-processing
+
+# View logs
+sudo journalctl -u voice-processing -f
+```
+
+### Alternative: Cron Job
+If you prefer cron over the service:
+```bash
+crontab -e
+# Add: */5 * * * * /path/to/project/scripts/vtm-cron-wrapper.sh
+```
+
 ## 🎛️ MCP Inspector Dashboard
 
 Interactive visual testing tool for the Notion MCP server:
