@@ -21,6 +21,20 @@
                 "PYTHONPATH": "/home/mike/development/task-management/src",
                 "PATH": "/home/mike/development/task-management/.venv/bin:${PATH}"
             }
+        },
+        "notionApi": {
+            "command": "docker",
+            "args": [
+                "run",
+                "--rm",
+                "-i",
+                "-e",
+                "OPENAPI_MCP_HEADERS",
+                "mcp/notion"
+            ],
+            "env": {
+                "OPENAPI_MCP_HEADERS": "{\"Authorization\":\"Bearer ${NOTION_TOKEN}\",\"Notion-Version\":\"2022-06-28\"}"
+            }
         }
     }
 }

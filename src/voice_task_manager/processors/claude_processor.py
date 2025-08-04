@@ -295,20 +295,21 @@ Remember to:
    - MATCH (t:TASK)-[:BELONGS_TO]->(p:PROJECT) WHERE t.name CONTAINS 'similar' RETURN t, p
 3. Return ONLY the JSON response, no explanations"""
             
+            # Change to project directory to use its .mcp.json
+            import os
+            original_cwd = os.getcwd()
+            project_dir = "/home/mike/development/task-management"
+            
             cmd = [
                 claude_path, 
                 "-p", full_prompt,
                 "--dangerously-skip-permissions",
+                "--mcp-config", f"{project_dir}/.mcp.json",
                 "--output-format", "json"
             ]
             
             self.logger.info(f"Executing Claude with MCP access")
             self.logger.debug(f"Prompt length: {len(full_prompt)} characters")
-            
-            # Change to project directory to use its .mcp.json
-            import os
-            original_cwd = os.getcwd()
-            project_dir = "/home/mike/development/task-management"
             
             try:
                 os.chdir(project_dir)

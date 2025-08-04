@@ -8,6 +8,9 @@ node_modules/
 .env.local
 .env.production
 
+# MCP configuration - contains sensitive tokens
+.mcp.json
+
 # Service account keys - NEVER commit these!
 mw-proj-*.json
 *-service-account.json

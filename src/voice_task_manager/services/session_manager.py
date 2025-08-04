@@ -252,7 +252,7 @@ class ClaudeSessionManager:
         self.notifier.send_notification(
             title="Claude Authentication Expiring",
             message=message,
-            urgency="normal"
+            priority="normal"
         )
         
         self.logger.info("Claude OAuth expiring soon", days_left=days_left)
@@ -269,7 +269,7 @@ class ClaudeSessionManager:
         self.notifier.send_notification(
             title="Claude Authentication Required",
             message=message,
-            urgency="normal"
+            priority="normal"
         )
         
         self.logger.warning("Claude credentials missing")

@@ -57,22 +57,22 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                 
                 # Execute via claude -p in the project directory
                 # Use full path to claude command
+                import os
+                original_cwd = os.getcwd()
+                project_dir = "/home/mike/development/task-management"
+                
                 claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
                 cmd = [
                     claude_path, 
                     "-p", prompt,
                     "--dangerously-skip-permissions",
+                    "--mcp-config", f"{project_dir}/.mcp.json",
                     "--mcp-debug",  # Add debug flag for better MCP troubleshooting
                     "--output-format", "json"
                 ]
                 
                 self.logger.debug(f"Executing real MCP command: {tool_name}")
                 self.logger.debug(f"Command: {' '.join(cmd)}")
-                
-                # Change to project directory to use its .mcp.json
-                import os
-                original_cwd = os.getcwd()
-                project_dir = "/home/mike/development/task-management"
                 
                 try:
                     os.chdir(project_dir)
