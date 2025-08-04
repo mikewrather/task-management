@@ -138,6 +138,15 @@ class VoiceProcessorV2:
         
         return adapters
     
+    def run_automation(self) -> Dict[str, Any]:
+        """
+        Run automated voice processing cycle
+        
+        Returns:
+            Dictionary containing processing results
+        """
+        return self.process_all_files(dry_run=False)
+    
     def process_all_files(self, dry_run: bool = False) -> Dict[str, Any]:
         """
         Process all available voice files
