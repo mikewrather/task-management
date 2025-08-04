@@ -173,11 +173,11 @@ class VoiceDatabase:
             return None
     
     def is_file_processed(self, file_id: str) -> bool:
-        """Check if file has been processed (backward compatible)"""
+        """Check if file has been processed or is currently being processed"""
         with self.get_connection() as conn:
             row = conn.execute(
-                'SELECT file_id FROM processed_files WHERE file_id = ? AND status = ?',
-                (file_id, 'completed')
+                'SELECT file_id FROM processed_files WHERE file_id = ? AND status IN (?, ?)',
+                (file_id, 'completed', 'processing')
             ).fetchone()
             return row is not None
     

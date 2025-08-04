@@ -862,3 +862,39 @@ sudo systemctl status voice-processing
 - Project structure verified compliant
 - Import compatibility issues resolved
 - All tests passing (31/35 unit tests, 18/18 session manager tests)
+
+---
+
+## 2025-08-04: Critical Bug Fixes - Race Condition and Claude Parsing
+
+**Issues Identified & Resolved**:
+
+**1. Race Condition in File Processing** ⚠️ → ✅
+- **Problem**: Files marked as `status='processing'` were being reprocessed by subsequent daemon cycles
+- **Root Cause**: `is_file_processed()` method only excluded `status='completed'` files
+- **Impact**: Same voice file processed multiple times concurrently (5-minute daemon interval vs longer processing time)
+- **Fix**: Updated `database.py:175-182` to exclude both `'completed'` AND `'processing'` files
+- **Result**: Daemon now correctly skips files already being processed
+
+**2. Claude JSON Parsing Failure** ❌ → ✅  
+- **Problem**: `❌ ERROR: Claude processing failed: None` followed by successful fallback task creation
+- **Root Cause**: Claude Code returns double-wrapped JSON format that wasn't being parsed correctly
+- **Impact**: Intelligent task categorization failed, falling back to basic task creation
+- **Fix**: Enhanced JSON parsing in `claude_processor.py:341-362` to handle:
+  - Claude Code execution result wrapper format
+  - Inner markdown code block extraction (````json...````)
+  - Multiple fallback parsing strategies
+- **Result**: Claude now successfully provides intelligent task categorization with GraphRAG context
+
+**Technical Details**:
+- **Race condition**: Files with long processing times (GraphRAG + Notion operations) would get picked up again before completion
+- **JSON parsing**: Claude responses wrapped as `{"type":"result", "result":"```json\n{actual_json}\n```"}` 
+- **Fallback robustness**: Task creation still works when Claude fails, ensuring no voice notes are lost
+
+**Testing & Validation**:
+- ✅ Race condition fix verified with monitoring daemon logs  
+- ✅ Claude parsing fix tested with debug script and real voice transcript
+- ✅ MCP servers (notion-task-management, agent-db) confirmed operational
+- ✅ No service restart required - changes apply on next 5-minute daemon cycle
+
+**System Reliability**: Both fixes address core stability issues that were causing suboptimal performance in the automated voice task management pipeline.

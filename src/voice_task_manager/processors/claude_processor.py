@@ -279,6 +279,11 @@ REMEMBER: Your goal is to create a well-connected knowledge graph. Every task sh
     
     def _execute_claude_with_mcp(self, prompt: str) -> Dict[str, Any]:
         """Execute Claude with MCP access for intelligent processing"""
+        # Define project_dir at the start to avoid scope issues
+        import os
+        original_cwd = os.getcwd()
+        project_dir = "/home/mike/development/task-management"
+        
         try:
             # Use Claude with project context and MCP access
             # Use full path to claude command
@@ -294,11 +299,6 @@ Remember to:
    - MATCH (a:AREA) WHERE toLower(a.name) CONTAINS toLower('keyword') RETURN a
    - MATCH (t:TASK)-[:BELONGS_TO]->(p:PROJECT) WHERE t.name CONTAINS 'similar' RETURN t, p
 3. Return ONLY the JSON response, no explanations"""
-            
-            # Change to project directory to use its .mcp.json
-            import os
-            original_cwd = os.getcwd()
-            project_dir = "/home/mike/development/task-management"
             
             cmd = [
                 claude_path, 
@@ -329,8 +329,38 @@ Remember to:
             # Parse JSON from Claude's response
             output = result.stdout.strip()
             
+            # Debug: Log basic Claude response info
+            if result.stderr:
+                self.logger.debug(f"Claude stderr: {result.stderr[:500]}")
+            
             # Extract JSON (Claude might include tool use output)
             import re
+            
+            # First, check if this is a Claude Code execution result format
+            try:
+                parsed_output = json.loads(output)
+                if isinstance(parsed_output, dict) and "result" in parsed_output:
+                    # Extract the actual result from Claude Code wrapper
+                    inner_result = parsed_output["result"]
+                    if isinstance(inner_result, str):
+                        # Try to parse the inner result as JSON
+                        try:
+                            return json.loads(inner_result)
+                        except json.JSONDecodeError:
+                            # Check if it's wrapped in markdown code blocks
+                            json_block_match = re.search(r'```json\s*(.*?)\s*```', inner_result, re.DOTALL)
+                            if json_block_match:
+                                try:
+                                    return json.loads(json_block_match.group(1))
+                                except json.JSONDecodeError:
+                                    pass
+                            # If inner result isn't JSON, fall through to regex extraction
+                            pass
+                    elif isinstance(inner_result, dict):
+                        return inner_result
+            except json.JSONDecodeError:
+                pass
+            
             # Look for JSON with either "success" or "tasks" key
             json_match = re.search(r'\{.*(?:"success"|"tasks").*\}', output, re.DOTALL)
             if json_match:
@@ -353,7 +383,7 @@ Remember to:
                     pass
                     
                 self.logger.error(f"Failed to parse Claude response: {output[:500]}")
-                return {"success": False, "error": "Invalid JSON response"}
+                return {"success": False, "error": f"Invalid JSON response: {output[:200]}"}
                     
         except subprocess.TimeoutExpired as e:
             self.logger.error(f"Claude execution timed out after 120 seconds")
