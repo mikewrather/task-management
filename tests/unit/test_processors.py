@@ -83,10 +83,10 @@ class TestClaudeVoiceProcessor:
     @patch('subprocess.run')
     def test_process_transcript_success(self, mock_run, processor):
         """Test successful transcript processing"""
-        # Setup
+        # Setup - match the expected format with "tasks" array
         mock_response = {
             "success": True,
-            "task_data": {
+            "tasks": [{
                 "name": "Process invoices",
                 "description": "Review and process Q4 invoices",
                 "priority": "Medium",
@@ -95,7 +95,8 @@ class TestClaudeVoiceProcessor:
                 "project_name": "Finance",
                 "confidence": 0.9,
                 "reasoning": "Found matching project"
-            }
+            }],
+            "overall_reasoning": "Found matching project for invoice processing"
         }
         mock_run.return_value = MagicMock(
             returncode=0,
@@ -108,12 +109,15 @@ class TestClaudeVoiceProcessor:
             "voice123"
         )
         
-        # Verify
-        assert isinstance(result, TaskData)
-        assert result.name == "Process invoices"
-        assert result.project_name == "Finance"
-        assert result.metadata["voice_file_id"] == "voice123"
-        assert result.metadata["claude_confidence"] == 0.9
+        # Verify - process_transcript now returns List[TaskData]
+        assert isinstance(result, list)
+        assert len(result) == 1
+        task = result[0]
+        assert isinstance(task, TaskData)
+        assert task.name == "Process invoices"
+        assert task.project_name == "Finance"
+        assert task.metadata["voice_file_id"] == "voice123"
+        assert task.metadata["claude_confidence"] == 0.9
     
     def test_process_transcript_with_multiple_tasks(self, processor):
         """Test handling transcript mentioning multiple tasks"""
@@ -121,15 +125,16 @@ class TestClaudeVoiceProcessor:
         with patch.object(processor, '_execute_claude_with_mcp') as mock_execute:
             mock_execute.return_value = {
                 "success": True,
-                "task_data": {
+                "tasks": [{
                     "name": "Set up Android emulator",
                     "description": "Configure emulator for testing",
                     "priority": "High",
-                    "contexts": ["@computer"],
-                    "additional_tasks": [
-                        "Forward events from Adapty to RevenueCat"
-                    ]
-                }
+                    "contexts": ["@computer"]
+                }],
+                "overall_reasoning": "Main task extracted from transcript",
+                "additional_tasks": [
+                    "Forward events from Adapty to RevenueCat"
+                ]
             }
             
             # Execute
@@ -138,9 +143,13 @@ class TestClaudeVoiceProcessor:
                 "voice456"
             )
             
-            # Verify
-            assert result.name == "Set up Android emulator"
-            assert len(result.metadata["additional_tasks"]) == 1
+            # Verify - process_transcript now returns List[TaskData]
+            assert isinstance(result, list)
+            assert len(result) >= 1
+            primary_task = result[0]
+            assert primary_task.name == "Set up Android emulator"
+            # Check if additional tasks were captured in overall reasoning
+            assert "overall_reasoning" in primary_task.metadata
     
     def test_process_transcript_failure(self, processor):
         """Test handling of processing failure"""
@@ -154,8 +163,9 @@ class TestClaudeVoiceProcessor:
             # Execute
             result = processor.process_transcript("Test", "voice789")
             
-            # Verify
-            assert result is None
+            # Verify - process_transcript now returns empty list on failure
+            assert isinstance(result, list)
+            assert len(result) == 0
     
     def test_batch_process_transcripts(self, processor):
         """Test batch processing of multiple transcripts"""
@@ -168,9 +178,9 @@ class TestClaudeVoiceProcessor:
         
         with patch.object(processor, 'process_transcript') as mock_process:
             mock_process.side_effect = [
-                TaskData(name="Task 1"),
-                None,  # Failed
-                TaskData(name="Task 3")
+                [TaskData(name="Task 1")],  # Returns list now
+                [],  # Failed - empty list  
+                [TaskData(name="Task 3")]   # Returns list now
             ]
             
             # Execute

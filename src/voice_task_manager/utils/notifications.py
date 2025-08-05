@@ -39,7 +39,7 @@ except ImportError:
 from ..utils.logging import VoiceLogger
 from ..utils.database import VoiceDatabase
 from ..models.voice_file import VoiceFile
-from ..models.task import NotionTask
+from ..models.task import Task
 
 class NotificationPriority(Enum):
     """Notification priority levels"""
@@ -218,13 +218,13 @@ Voice Task Management System''',
             }
         }
     
-    def notify_processing_success(self, voice_file: VoiceFile, task: Optional[NotionTask] = None) -> Dict[str, bool]:
+    def notify_processing_success(self, voice_file: VoiceFile, task: Optional[Task] = None) -> Dict[str, bool]:
         """
         Send notifications when a file is successfully processed
         
         Args:
             voice_file: The processed voice file
-            task: The created Notion task (optional)
+            task: The created task (optional)
             
         Returns:
             Dictionary with success status for each notification channel
@@ -585,7 +585,7 @@ def get_notification_system(project_root: Optional[Path] = None) -> VoiceNotific
     """Get a VoiceNotificationSystem instance"""
     return VoiceNotificationSystem(project_root)
 
-def notify_success(voice_file: VoiceFile, task: Optional[NotionTask] = None) -> Dict[str, bool]:
+def notify_success(voice_file: VoiceFile, task: Optional[Task] = None) -> Dict[str, bool]:
     """Quick success notification"""
     system = get_notification_system()
     return system.notify_processing_success(voice_file, task)

@@ -32,6 +32,7 @@ class Task:
     contexts: List[str] = field(default_factory=lambda: ['voice', 'auto-processed'])
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
+    url: Optional[str] = None  # URL to task (for backward compatibility with NotionTask)
     voice_file_id: Optional[str] = None
     transcript_source: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -139,6 +140,7 @@ class Task:
             'contexts': self.contexts,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'url': self.url,
             'voice_file_id': self.voice_file_id,
             'transcript_source': self.transcript_source,
             'metadata': self.metadata
@@ -159,6 +161,7 @@ class Task:
             contexts=data.get('contexts', ['voice', 'auto-processed']),
             created_at=created_at,
             updated_at=updated_at,
+            url=data.get('url'),
             voice_file_id=data.get('voice_file_id'),
             transcript_source=data.get('transcript_source'),
             metadata=data.get('metadata', {})

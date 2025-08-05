@@ -18,7 +18,7 @@ from unittest.mock import Mock, patch
 from tempfile import TemporaryDirectory
 
 from voice_task_manager.models.voice_file import VoiceFile
-from voice_task_manager.models.task import NotionTask  
+from voice_task_manager.models.task import Task  
 from voice_task_manager.utils.database import VoiceDatabase
 from voice_task_manager.core.processor import VoiceProcessor
 

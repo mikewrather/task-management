@@ -12,10 +12,10 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from ..models.voice_file import VoiceFile
-from ..models.task import NotionTask
+from ..models.task import Task
 from ..integrations.drive import GoogleDriveClient
 from ..integrations.whisper import WhisperClient
-from ..integrations.notion import NotionClient
+# from ..integrations.notion import # NotionClient  # Removed - using pure GraphRAG now  # Removed - using pure GraphRAG now
 from ..utils.logging import VoiceLogger
 from ..utils.database import VoiceDatabase
 
@@ -56,7 +56,8 @@ class VoiceProcessor:
         try:
             self.drive_client = GoogleDriveClient(logger=self.logger)
             self.whisper_client = WhisperClient(logger=self.logger)
-            self.notion_client = NotionClient(logger=self.logger)
+            # self.notion_client = NotionClient(logger=self.logger)  # Removed - using pure GraphRAG now
+            self.notion_client = None
         except ValueError as e:
             self.logger.error("Failed to initialize API clients", exception=e)
             raise
@@ -337,8 +338,8 @@ class VoiceProcessor:
                 processed_file = self.database.get_voice_file(voice_file.file_id)
                 if processed_file and processed_file.transcript and processed_file.task_url:
                     # Create a simple task object for notification
-                    from ..models.task import NotionTask
-                    task = NotionTask(
+                    from ..models.task import Task
+                    task = Task(
                         id="",  # Not needed for notification
                         url=processed_file.task_url,
                         name=processed_file.transcript[:100]

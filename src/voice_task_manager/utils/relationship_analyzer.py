@@ -2,7 +2,7 @@
 Relationship Analyzer for Voice Task Management System
 
 This module provides utilities for analyzing and cleaning up relationships between tasks,
-projects, areas, and goals in both Notion and GraphRAG storage systems.
+projects, areas, and goals in the GraphRAG storage system.
 
 Features:
 - Duplicate task detection using fuzzy matching
@@ -84,8 +84,8 @@ class RelationshipAnalyzer:
             self.logger.warning(f"GraphRAG adapter not available: {e}")
         
         try:
-            from ..adapters.notion import NotionTaskAdapter
-            self.notion_adapter = NotionTaskAdapter(logger=self.logger)
+            # Notion adapter removed - using pure GraphRAG now
+            self.notion_adapter = None
         except Exception as e:
             self.logger.warning(f"Notion adapter not available: {e}")
     

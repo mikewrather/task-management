@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 import json
 
 from voice_task_manager.models.voice_file import VoiceFile
-from voice_task_manager.models.task import NotionTask
+from voice_task_manager.models.task import Task
 
 
 class TestVoiceFile:
@@ -158,12 +158,12 @@ class TestVoiceFile:
         assert isinstance(voice_file.discovered_at, datetime)
 
 
-class TestNotionTask:
-    """Test cases for NotionTask model"""
+class TestTask:
+    """Test cases for Task model"""
     
-    def test_notion_task_creation_minimal(self):
-        """Test creating a NotionTask with minimal data"""
-        task = NotionTask(
+    def test_task_creation_minimal(self):
+        """Test creating a Task with minimal data"""
+        task = Task(
             task_id="task_123",
             title="Test Task",
             content="Test content"  # Fixed: content is required parameter
@@ -180,9 +180,9 @@ class TestNotionTask:
         assert task.metadata == {}
     
     def test_notion_task_creation_full(self):
-        """Test creating a NotionTask with all data"""
+        """Test creating a Task with all data"""
         now = datetime.now()
-        task = NotionTask(
+        task = Task(
             task_id="task_123",
             title="Test Task",
             content="This is test content",
@@ -207,7 +207,7 @@ class TestNotionTask:
     
     def test_update_status(self):
         """Test updating task status"""
-        task = NotionTask(task_id="test", title="Test", content="Test content")
+        task = Task(task_id="test", title="Test", content="Test content")
         assert task.status == "Inbox"
         
         task.update_status("In Progress")
@@ -216,7 +216,7 @@ class TestNotionTask:
     
     def test_add_context(self):
         """Test adding context to task"""
-        task = NotionTask(task_id="test", title="Test", content="Test content")
+        task = Task(task_id="test", title="Test", content="Test content")
         assert task.contexts == ["voice", "auto-processed"]  # Fixed: default contexts
         
         task.add_context("work")
@@ -230,7 +230,7 @@ class TestNotionTask:
     
     def test_remove_context(self):
         """Test removing context from task"""
-        task = NotionTask(task_id="test", title="Test", content="Test content", contexts=["voice", "work"])
+        task = Task(task_id="test", title="Test", content="Test content", contexts=["voice", "work"])
         
         task.remove_context("work")
         assert "work" not in task.contexts
@@ -239,7 +239,7 @@ class TestNotionTask:
     
     def test_url_property(self):
         """Test URL property"""
-        task = NotionTask(
+        task = Task(
             task_id="test",
             title="Test Task",
             content="Test content",
@@ -249,13 +249,13 @@ class TestNotionTask:
         assert task.url == "https://www.notion.so/task-123"
         
         # Test with None URL
-        task_no_url = NotionTask(task_id="test", title="Test", content="Test content")
+        task_no_url = Task(task_id="test", title="Test", content="Test content")
         assert task_no_url.url is None
     
     def test_to_dict(self):
-        """Test converting NotionTask to dictionary"""
+        """Test converting Task to dictionary"""
         now = datetime.now()
-        task = NotionTask(
+        task = Task(
             task_id="test_task",
             title="Test Task",
             content="Test content",
@@ -273,7 +273,7 @@ class TestNotionTask:
         assert isinstance(result, dict)
     
     def test_from_dict(self):
-        """Test creating NotionTask from dictionary"""
+        """Test creating Task from dictionary"""
         now = datetime.now()
         data = {
             "task_id": "test_task",
@@ -285,7 +285,7 @@ class TestNotionTask:
             "voice_file_id": "file_123"
         }
         
-        task = NotionTask.from_dict(data)
+        task = Task.from_dict(data)
         
         assert task.task_id == "test_task"
         assert task.title == "Test Task"
@@ -296,7 +296,7 @@ class TestNotionTask:
         assert isinstance(task.created_at, datetime)
     
     def test_from_dict_with_context_parsing(self):
-        """Test creating NotionTask from dict with context parsing"""
+        """Test creating Task from dict with context parsing"""
         now = datetime.now()
         # Test with list contexts
         data = {
@@ -306,30 +306,30 @@ class TestNotionTask:
             "created_at": now.isoformat(),
             "contexts": ["voice", "work", "urgent"]
         }
-        task = NotionTask.from_dict(data)
+        task = Task.from_dict(data)
         assert task.contexts == ["voice", "work", "urgent"]
         
         # Test with different list contexts
         data["contexts"] = ["voice", "personal"]
-        task = NotionTask.from_dict(data)
+        task = Task.from_dict(data)
         assert task.contexts == ["voice", "personal"]
         
         # Test with missing contexts key (gets default)
         del data["contexts"]  # Remove the key entirely
-        task = NotionTask.from_dict(data)
+        task = Task.from_dict(data)
         assert task.contexts == ["voice", "auto-processed"]  # Default when key missing
     
     def test_task_validation(self):
         """Test task data validation"""
         # Test valid task
-        task = NotionTask(task_id="valid", title="Valid Task", content="Valid content")
+        task = Task(task_id="valid", title="Valid Task", content="Valid content")
         assert task.task_id == "valid"
         
         # Test empty title (should still work)
-        task = NotionTask(task_id="test", title="", content="Test content")
+        task = Task(task_id="test", title="", content="Test content")
         assert task.title == ""
         
         # Test long title (no truncation implemented)
         long_title = "A" * 300
-        task = NotionTask(task_id="test", title=long_title, content="Test content")
+        task = Task(task_id="test", title=long_title, content="Test content")
         assert task.title == long_title  # No truncation in current implementation

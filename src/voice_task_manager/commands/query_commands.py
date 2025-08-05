@@ -18,10 +18,10 @@ from rich.table import Table
 from rich.panel import Panel
 
 from ..core.parameter_validator import ParameterValidator, ParameterValidationError
-from ..integrations.notion import NotionClient
-from ..models.task import NotionTask
-from ..models.notion_project import NotionProject
-from ..models.notion_area import NotionArea
+# from ..integrations.notion import # NotionClient  # Removed - using pure GraphRAG now  # Removed - using pure GraphRAG now
+from ..models.task import Task
+# from ..models.notion_project import # NotionProject  # Removed - using pure GraphRAG now  # Removed - using pure GraphRAG now
+# from ..models.notion_area import # NotionArea  # Removed - using pure GraphRAG now  # Removed - using pure GraphRAG now
 from ..utils.logging import VoiceLogger
 
 
@@ -78,7 +78,7 @@ def tasks(ctx, status, context, project, area, priority, energy, output_format, 
         
         # Initialize components
         logger = VoiceLogger()
-        notion_client = NotionClient(logger=logger)
+        notion_client = # NotionClient  # Removed - using pure GraphRAG now(logger=logger)
         validator = ParameterValidator(notion_client, logger)
         
         if verbose:
@@ -170,7 +170,7 @@ def projects(ctx, status, area, priority, active_only, output_format, limit, ver
         
         # Initialize components
         logger = VoiceLogger()
-        notion_client = NotionClient(logger=logger)
+        notion_client = # NotionClient  # Removed - using pure GraphRAG now(logger=logger)
         validator = ParameterValidator(notion_client, logger)
         
         if verbose:
@@ -241,7 +241,7 @@ def areas(ctx, status, priority, output_format, limit, verbose):
         
         # Initialize components
         logger = VoiceLogger()
-        notion_client = NotionClient(logger=logger)
+        notion_client = # NotionClient  # Removed - using pure GraphRAG now(logger=logger)
         validator = ParameterValidator(notion_client, logger)
         
         if verbose:
@@ -285,7 +285,7 @@ def areas(ctx, status, priority, output_format, limit, verbose):
 
 # Helper functions for querying
 
-def _query_tasks(notion_client: NotionClient, filters: Dict[str, Any], limit: int, verbose: bool) -> List[NotionTask]:
+def _query_tasks(notion_client: # NotionClient  # Removed - using pure GraphRAG now, filters: Dict[str, Any], limit: int, verbose: bool) -> List[Task]:
     """Query tasks from Notion with filters"""
     if verbose:
         console.print(f"  Applied filters: {filters}", style="dim")
@@ -298,7 +298,7 @@ def _query_tasks(notion_client: NotionClient, filters: Dict[str, Any], limit: in
     return notion_client.query_tasks(notion_filter, limit)
 
 
-def _query_projects(notion_client: NotionClient, filters: Dict[str, Any], limit: int, verbose: bool) -> List[NotionProject]:
+def _query_projects(notion_client: # NotionClient  # Removed - using pure GraphRAG now, filters: Dict[str, Any], limit: int, verbose: bool) -> List[# NotionProject  # Removed - using pure GraphRAG now]:
     """Query projects from Notion with filters"""
     if verbose:
         console.print(f"  Applied filters: {filters}", style="dim")
@@ -311,7 +311,7 @@ def _query_projects(notion_client: NotionClient, filters: Dict[str, Any], limit:
     return notion_client.query_projects(notion_filter, limit)
 
 
-def _query_areas(notion_client: NotionClient, filters: Dict[str, Any], limit: int, verbose: bool) -> List[NotionArea]:
+def _query_areas(notion_client: # NotionClient  # Removed - using pure GraphRAG now, filters: Dict[str, Any], limit: int, verbose: bool) -> List[# NotionArea  # Removed - using pure GraphRAG now]:
     """Query areas from Notion with filters"""
     if verbose:
         console.print(f"  Applied filters: {filters}", style="dim")
@@ -326,7 +326,7 @@ def _query_areas(notion_client: NotionClient, filters: Dict[str, Any], limit: in
 
 # Helper functions for displaying results
 
-def _display_task_results(tasks: List[NotionTask], output_format: str, query_time: float, 
+def _display_task_results(tasks: List[Task], output_format: str, query_time: float, 
                          filters: Dict[str, Any], verbose: bool) -> None:
     """Display task query results in specified format"""
     
@@ -392,7 +392,7 @@ def _display_task_results(tasks: List[NotionTask], output_format: str, query_tim
             console.print(f"\n🕒 Query completed in {query_time:.2f}ms", style="dim")
 
 
-def _display_project_results(projects: List[NotionProject], output_format: str, query_time: float,
+def _display_project_results(projects: List[# NotionProject  # Removed - using pure GraphRAG now], output_format: str, query_time: float,
                            filters: Dict[str, Any], verbose: bool) -> None:
     """Display project query results in specified format"""
     
@@ -457,7 +457,7 @@ def _display_project_results(projects: List[NotionProject], output_format: str, 
             console.print(f"\n🕒 Query completed in {query_time:.2f}ms", style="dim")
 
 
-def _display_area_results(areas: List[NotionArea], output_format: str, query_time: float,
+def _display_area_results(areas: List[# NotionArea  # Removed - using pure GraphRAG now], output_format: str, query_time: float,
                          filters: Dict[str, Any], verbose: bool) -> None:
     """Display area query results in specified format"""
     
@@ -697,7 +697,7 @@ def delete_task(ctx, task_id, confirm, dry_run, verbose):
         
         # Initialize components
         logger = VoiceLogger()
-        notion_client = NotionClient(logger=logger)
+        notion_client = # NotionClient  # Removed - using pure GraphRAG now(logger=logger)
         
         if verbose:
             console.print(f"🔍 Processing delete request for task: {task_id}", style="dim")

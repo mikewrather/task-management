@@ -13,7 +13,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 
-from ..integrations.notion import NotionClient
+# from ..integrations.notion import NotionClient  # Removed - using pure GraphRAG now
 from ..utils.logging import VoiceLogger
 
 
@@ -35,8 +35,7 @@ class ParameterValidator:
     fuzzy matching suggestions, and dynamic option fetching from Notion databases.
     """
     
-    def __init__(self, notion_client: NotionClient = None, logger: VoiceLogger = None):
-        self.notion_client = notion_client
+    def __init__(self, logger: VoiceLogger = None):
         self.logger = logger
         self.console = Console()
         
@@ -318,15 +317,8 @@ class ParameterValidator:
             "voice", "voice-created", "auto-processed", "needs-review", "test"
         ]
         
-        # Try to fetch from Notion if client available
-        if self.notion_client:
-            try:
-                # This would require extending NotionClient to fetch available contexts
-                # For now, use static list
-                pass
-            except Exception as e:
-                if self.logger:
-                    self.logger.warning("Failed to fetch contexts from Notion", exception=e)
+        # GraphRAG integration could be added here to fetch dynamic contexts
+        # For now, use static list of known contexts
         
         # Update cache
         if 'tasks' not in self._option_cache:
