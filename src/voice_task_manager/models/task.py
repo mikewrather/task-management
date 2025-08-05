@@ -1,6 +1,6 @@
 """
 Task Data Model
-Represents a Notion task created from voice recordings.
+Represents a task created from voice recordings in GraphRAG.
 """
 
 from dataclasses import dataclass, field
@@ -8,19 +8,18 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 
 @dataclass
-class NotionTask:
+class Task:
     """
-    Data model for Notion tasks created from voice recordings
+    Data model for tasks created from voice recordings
     
     Attributes:
-        task_id: Notion page ID
+        task_id: GraphRAG node ID  
         title: Task title
         content: Full task content
-        status: Task status in Notion (e.g., 'Inbox', 'In Progress', 'Done')
+        status: Task status (e.g., 'Inbox', 'In Progress', 'Done')
         contexts: List of context tags
         created_at: When the task was created
         updated_at: When the task was last updated
-        url: URL to the Notion page
         voice_file_id: ID of the source voice file
         transcript_source: Original transcript text
         metadata: Additional task metadata
@@ -33,7 +32,6 @@ class NotionTask:
     contexts: List[str] = field(default_factory=lambda: ['voice', 'auto-processed'])
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: Optional[datetime] = None
-    url: Optional[str] = None
     voice_file_id: Optional[str] = None
     transcript_source: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
@@ -102,18 +100,17 @@ class NotionTask:
     
     @classmethod
     def create_from_voice(cls, voice_file_id: str, transcript: str, 
-                         task_id: str, url: str) -> 'NotionTask':
+                         task_id: str) -> 'Task':
         """
-        Create a NotionTask from a voice recording
+        Create a Task from a voice recording
         
         Args:
             voice_file_id: ID of the source voice file
             transcript: Transcribed text
-            task_id: Notion page ID
-            url: URL to the Notion page
+            task_id: GraphRAG node ID
             
         Returns:
-            NotionTask instance
+            Task instance
         """
         # Create concise title from transcript
         title_text = transcript[:60] + "..." if len(transcript) > 60 else transcript
@@ -123,44 +120,14 @@ class NotionTask:
         content = f"Full transcript: {transcript}"
         
         return cls(
-            task_id=task_id,
+            task_id=task_id,  
             title=title,
             content=content,
             voice_file_id=voice_file_id,
             transcript_source=transcript,
-            url=url,
             contexts=['voice', 'auto-processed']
         )
     
-    def to_notion_data(self) -> Dict[str, Any]:
-        """
-        Convert to Notion API format for creating/updating pages
-        
-        Returns:
-            Dictionary formatted for Notion API
-        """
-        return {
-            "properties": {
-                "Name": {
-                    "title": [{"text": {"content": self.title}}]
-                },
-                "Status": {
-                    "status": {"name": self.status}
-                },
-                "Contexts": {
-                    "multi_select": [{"name": context} for context in self.contexts]
-                }
-            },
-            "children": [
-                {
-                    "object": "block",
-                    "type": "paragraph",
-                    "paragraph": {
-                        "rich_text": [{"type": "text", "text": {"content": self.content}}]
-                    }
-                }
-            ] if len(self.content) > 100 else []
-        }
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization"""
@@ -172,14 +139,13 @@ class NotionTask:
             'contexts': self.contexts,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'url': self.url,
             'voice_file_id': self.voice_file_id,
             'transcript_source': self.transcript_source,
             'metadata': self.metadata
         }
     
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'NotionTask':
+    def from_dict(cls, data: Dict[str, Any]) -> 'Task':
         """Create instance from dictionary"""
         # Handle datetime parsing
         created_at = datetime.fromisoformat(data['created_at'])
@@ -193,57 +159,11 @@ class NotionTask:
             contexts=data.get('contexts', ['voice', 'auto-processed']),
             created_at=created_at,
             updated_at=updated_at,
-            url=data.get('url'),
             voice_file_id=data.get('voice_file_id'),
             transcript_source=data.get('transcript_source'),
             metadata=data.get('metadata', {})
         )
     
-    @classmethod
-    def from_notion_response(cls, response_data: Dict[str, Any], 
-                           voice_file_id: Optional[str] = None) -> 'NotionTask':
-        """
-        Create instance from Notion API response
-        
-        Args:
-            response_data: Raw response from Notion API
-            voice_file_id: Associated voice file ID (if known)
-            
-        Returns:
-            NotionTask instance
-        """
-        properties = response_data.get('properties', {})
-        
-        # Extract title
-        title_prop = properties.get('Name', {}).get('title', [])
-        title = title_prop[0]['text']['content'] if title_prop else 'Untitled'
-        
-        # Extract status
-        status_prop = properties.get('Status', {}).get('status')
-        status = status_prop['name'] if status_prop else 'Inbox'
-        
-        # Extract contexts
-        contexts_prop = properties.get('Contexts', {}).get('multi_select', [])
-        contexts = [ctx['name'] for ctx in contexts_prop]
-        
-        # Extract timestamps
-        created_time = response_data.get('created_time')
-        last_edited_time = response_data.get('last_edited_time')
-        
-        created_at = datetime.fromisoformat(created_time.replace('Z', '+00:00')) if created_time else datetime.now()
-        updated_at = datetime.fromisoformat(last_edited_time.replace('Z', '+00:00')) if last_edited_time else None
-        
-        return cls(
-            task_id=response_data['id'],
-            title=title,
-            content='',  # Content would need separate API call to get blocks
-            status=status,
-            contexts=contexts,
-            created_at=created_at,
-            updated_at=updated_at,
-            url=response_data.get('url'),
-            voice_file_id=voice_file_id
-        )
     
     def __str__(self) -> str:
         """String representation"""
@@ -254,9 +174,9 @@ class NotionTask:
         }
         emoji = status_emoji.get(self.status.lower(), '📋')
         
-        return f"{emoji} NotionTask({self.title[:30]}..., {self.status})"
+        return f"{emoji} Task({self.title[:30]}..., {self.status})"
     
     def __repr__(self) -> str:
         """Detailed representation"""
-        return (f"NotionTask(task_id='{self.task_id}', title='{self.title[:30]}...', "
+        return (f"Task(task_id='{self.task_id}', title='{self.title[:30]}...', "
                 f"status='{self.status}', contexts={self.contexts})")

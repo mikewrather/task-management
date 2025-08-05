@@ -14,7 +14,7 @@ from contextlib import contextmanager
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="sqlite3")
 
 from ..models.voice_file import VoiceFile
-from ..models.task import NotionTask
+from ..models.task import Task
 
 class VoiceDatabase:
     """Enhanced database operations for voice processing system"""
