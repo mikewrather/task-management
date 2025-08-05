@@ -3,7 +3,7 @@
 import subprocess
 import json
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from ..adapters.base import TaskData
 from ..adapters.graphrag import GraphRAGTaskAdapter
@@ -72,14 +72,26 @@ class ClaudeVoiceProcessor:
             # Create TaskData objects for each task
             created_tasks = []
             for i, task_info in enumerate(tasks_data):
+                # Handle project creation if needed
+                project_id = task_info.get("project_id")
+                project_name = task_info.get("project_name")
+                
+                if task_info.get("create_project", False) and task_info.get("suggested_project"):
+                    # Attempt to create the suggested project
+                    project_id, project_name = self._create_project_if_needed(task_info.get("suggested_project"))
+                    if project_id:
+                        self.logger.success(f"Created new project: '{project_name}' (ID: {project_id})")
+                    else:
+                        self.logger.warning(f"Failed to create suggested project: '{task_info['suggested_project'].get('name')}'")
+                
                 task_data = TaskData(
                     name=task_info.get("name", f"Voice Task {i+1}: {transcript[:50]}..."),
                     description=task_info.get("description", transcript),
                     status=task_info.get("status", "Inbox"),
                     priority=task_info.get("priority", "Medium"),
                     contexts=task_info.get("contexts", ["voice", "auto-processed"]),
-                    project_id=task_info.get("project_id"),
-                    project_name=task_info.get("project_name"),
+                    project_id=project_id,
+                    project_name=project_name,
                     area_id=task_info.get("area_id"),
                     area_name=task_info.get("area_name"),
                     goal_id=task_info.get("goal_id"),
@@ -91,7 +103,8 @@ class ClaudeVoiceProcessor:
                         "reasoning": task_info.get("reasoning", ""),
                         "task_number": i + 1,
                         "total_tasks": len(tasks_data),
-                        "overall_reasoning": overall_reasoning
+                        "overall_reasoning": overall_reasoning,
+                        "project_created": task_info.get("create_project", False)
                     }
                 )
                 
@@ -197,7 +210,16 @@ CRITICAL INSTRUCTIONS FOR RELATIONSHIP DISCOVERY:
    - If unsure between two projects/areas, choose the most likely one and explain in reasoning
    - Look at similar recent tasks to understand patterns
 
-5. **Extract Context and Priority**:
+5. **Project Creation When None Found**:
+   - If you find a suitable area but NO matching project for a task, consider creating one
+   - Only suggest project creation when:
+     * The task clearly represents a cohesive project scope (e.g., "API integration", "feature development")
+     * An area exists that would logically contain this project
+     * The task is substantial enough to warrant its own project (not just a single quick action)
+   - Generate a meaningful project name and description based on the task context
+   - Set `create_project: true` and provide `suggested_project` details in the response
+
+6. **Extract Context and Priority**:
    - Contexts: location (@home, @office), tool (@computer, @phone), time (@evening)
    - Priority: Listen for urgency words ("urgent", "ASAP", "important", "quick")
 
@@ -246,6 +268,8 @@ Return a JSON response:
             "project_name": "Project name if found",
             "area_id": "notion_id if found", 
             "area_name": "Area name if found",
+            "create_project": false,
+            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_id": "area_notion_id"}},
             "confidence": 0.0-1.0,
             "reasoning": "Why this categorization was chosen for this task"
         }},
@@ -259,6 +283,8 @@ Return a JSON response:
             "project_name": "Project name if found", 
             "area_id": "notion_id if found",
             "area_name": "Area name if found",
+            "create_project": false,
+            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_id": "area_notion_id"}},
             "confidence": 0.0-1.0,
             "reasoning": "Why this categorization was chosen for this task"
         }}
@@ -324,7 +350,13 @@ Remember to:
                 os.chdir(original_cwd)
             
             if result.returncode != 0:
-                return {"success": False, "error": f"Claude execution failed: {result.stderr}"}
+                error_msg = f"Claude execution failed: {result.stderr}"
+                self.logger.claude_response(
+                    prompt=full_prompt,
+                    raw_output=result.stderr or "",
+                    error=error_msg
+                )
+                return {"success": False, "error": error_msg}
             
             # Parse JSON from Claude's response
             output = result.stdout.strip()
@@ -335,6 +367,8 @@ Remember to:
             
             # Extract JSON (Claude might include tool use output)
             import re
+            parsed_result = None
+            parse_error = None
             
             # First, check if this is a Claude Code execution result format
             try:
@@ -345,44 +379,61 @@ Remember to:
                     if isinstance(inner_result, str):
                         # Try to parse the inner result as JSON
                         try:
-                            return json.loads(inner_result)
+                            parsed_result = json.loads(inner_result)
                         except json.JSONDecodeError:
                             # Check if it's wrapped in markdown code blocks
                             json_block_match = re.search(r'```json\s*(.*?)\s*```', inner_result, re.DOTALL)
                             if json_block_match:
                                 try:
-                                    return json.loads(json_block_match.group(1))
+                                    parsed_result = json.loads(json_block_match.group(1))
                                 except json.JSONDecodeError:
                                     pass
                             # If inner result isn't JSON, fall through to regex extraction
                             pass
                     elif isinstance(inner_result, dict):
-                        return inner_result
+                        parsed_result = inner_result
             except json.JSONDecodeError:
                 pass
             
-            # Look for JSON with either "success" or "tasks" key
-            json_match = re.search(r'\{.*(?:"success"|"tasks").*\}', output, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except json.JSONDecodeError:
-                    self.logger.error(f"Invalid JSON in match: {json_match.group()[:200]}")
-                    
-            # Fallback: try to parse the whole output
-            try:
-                return json.loads(output)
-            except:
-                # Try to extract JSON from Claude's response format
-                try:
-                    # Claude might wrap in ```json blocks
-                    json_block_match = re.search(r'```json\s*(.*?)\s*```', output, re.DOTALL)
-                    if json_block_match:
-                        return json.loads(json_block_match.group(1))
-                except:
-                    pass
-                    
-                self.logger.error(f"Failed to parse Claude response: {output[:500]}")
+            # If we didn't get a result yet, try other parsing methods
+            if parsed_result is None:
+                # Look for JSON with either "success" or "tasks" key
+                json_match = re.search(r'\{.*(?:"success"|"tasks").*\}', output, re.DOTALL)
+                if json_match:
+                    try:
+                        parsed_result = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        parse_error = f"Invalid JSON in match: {json_match.group()[:200]}"
+                        
+                # Fallback: try to parse the whole output
+                if parsed_result is None:
+                    try:
+                        parsed_result = json.loads(output)
+                    except:
+                        # Try to extract JSON from Claude's response format
+                        try:
+                            # Claude might wrap in ```json blocks
+                            json_block_match = re.search(r'```json\s*(.*?)\s*```', output, re.DOTALL)
+                            if json_block_match:
+                                parsed_result = json.loads(json_block_match.group(1))
+                        except:
+                            pass
+            
+            # Log the Claude response for debugging
+            if parsed_result is not None:
+                self.logger.claude_response(
+                    prompt=full_prompt,
+                    raw_output=output,
+                    parsed_result=parsed_result
+                )
+                return parsed_result
+            else:
+                error_msg = parse_error or f"Failed to parse Claude response: {output[:500]}"
+                self.logger.claude_response(
+                    prompt=full_prompt,
+                    raw_output=output,
+                    error=error_msg
+                )
                 return {"success": False, "error": f"Invalid JSON response: {output[:200]}"}
                     
         except subprocess.TimeoutExpired as e:
@@ -418,3 +469,115 @@ Remember to:
         
         self.logger.info(f"Batch processing complete: {len(all_tasks)} total tasks from {len(transcripts)} transcripts")
         return all_tasks
+    
+    def _create_project_if_needed(self, suggested_project: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Create a project if it doesn't exist and is deemed necessary
+        
+        Args:
+            suggested_project: Dict with name, description, area_id
+            
+        Returns:
+            Tuple of (project_id, project_name) if successful, (None, None) if failed
+        """
+        project_name = suggested_project.get("name")
+        project_description = suggested_project.get("description", "")
+        area_id = suggested_project.get("area_id")
+        
+        if not project_name:
+            return None, None
+        
+        self.logger.info(f"Creating new project: '{project_name}' in area ID: {area_id}")
+        
+        try:
+            # Try to create project in both adapters
+            notion_project_id = self._create_notion_project(project_name, project_description, area_id)
+            graphrag_project_id = self._create_graphrag_project(project_name, project_description, area_id)
+            
+            # Return the Notion ID if available (primary), otherwise GraphRAG ID
+            if notion_project_id:
+                return notion_project_id, project_name
+            elif graphrag_project_id:
+                return graphrag_project_id, project_name
+            else:
+                return None, None
+                
+        except Exception as e:
+            self.logger.error(f"Error creating project '{project_name}': {e}")
+            return None, None
+    
+    def _create_notion_project(self, name: str, description: str, area_id: Optional[str]) -> Optional[str]:
+        """Create project in Notion using MCP tools"""
+        try:
+            # Use MCP tools to create project in Notion
+            # This would need to be implemented using the notion-task-management MCP server
+            from ..adapters.notion import NotionTaskAdapter
+            
+            # Try to get a Notion adapter instance
+            # Note: This is a simplified approach - in practice you'd want better dependency injection
+            notion_adapter = NotionTaskAdapter(logger=self.logger)
+            
+            # For now, return None to indicate Notion project creation isn't implemented yet
+            # This can be implemented later when we have proper MCP project creation tools
+            self.logger.debug(f"Notion project creation not yet implemented for: {name}")
+            return None
+            
+        except Exception as e:
+            self.logger.debug(f"Notion project creation failed: {e}")
+            return None
+    
+    def _create_graphrag_project(self, name: str, description: str, area_id: Optional[str]) -> Optional[str]:
+        """Create project in GraphRAG using MCP tools"""
+        try:
+            # Create project node in GraphRAG
+            project_data = {
+                "name": name,
+                "description": description,
+                "status": "Active",
+                "created_from_voice": True
+            }
+            
+            # Create PROJECT entity
+            response = self.adapter._execute_mcp_command("create_entity", {
+                "entity_type": "PROJECT",
+                "properties": project_data
+            })
+            
+            if response and response.get("success"):
+                # Get the created project's ID
+                project_node_id = response.get("entity_id")
+                
+                # If we have an area_id, create the relationship
+                if area_id and project_node_id:
+                    self._create_project_area_relationship(project_node_id, area_id)
+                
+                self.logger.success(f"Created GraphRAG project: '{name}' (Node ID: {project_node_id})")
+                return str(project_node_id)
+            else:
+                self.logger.error(f"Failed to create project in GraphRAG: {response}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"GraphRAG project creation failed: {e}")
+            return None
+    
+    def _create_project_area_relationship(self, project_node_id: str, area_id: str) -> bool:
+        """Create BELONGS_TO relationship between project and area"""
+        try:
+            query = f"""
+            MATCH (p:PROJECT), (a:AREA)
+            WHERE ID(p) = {project_node_id} AND (a.notion_id = '{area_id}' OR ID(a) = {area_id})
+            MERGE (p)-[:BELONGS_TO]->(a)
+            RETURN p, a
+            """
+            
+            response = self.adapter._execute_mcp_command("execute_cypher", {
+                "query": query,
+                "parameters": {}
+            })
+            
+            return response.get("success", False)
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create project-area relationship: {e}")
+            return False
