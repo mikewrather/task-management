@@ -983,3 +983,46 @@ sudo systemctl status voice-processing
 - ✅ No service restart required - changes apply on next 5-minute daemon cycle
 
 **System Reliability**: Both fixes address core stability issues that were causing suboptimal performance in the automated voice task management pipeline.
+
+---
+
+## 2025-08-05: Complete Notion Removal - Pure GraphRAG Architecture
+
+**Milestone**: Successfully completed comprehensive removal of all Notion dependencies, transitioning to pure GraphRAG/Neo4j architecture.
+
+**Context**: During development of project creation capabilities, identified fundamental ID confusion issue where system mixed Notion UUIDs (strings) with GraphRAG node IDs (integers), creating ambiguity in relationship creation and project management.
+
+**Implementation**: Executed complete 9-phase removal plan from `docs/NOTION_REMOVAL_DESIGN.md`:
+
+**Phase 1-3 (Core Architecture)**:
+- Removed ~3000+ lines of Notion-specific code (adapters, integrations, models, tests)
+- Updated `TaskData` model: `project_id` → `project_node_id` (int), `area_id` → `area_node_id` (int), `goal_id` → `goal_node_id` (int)
+- Updated GraphRAG adapter to use `ID(node)` directly, added `create_project()` method
+
+**Phase 4-5 (Processing Layer)**:
+- Updated Claude processor prompts to use node IDs instead of notion_ids
+- Simplified project creation to GraphRAG-only with clear integer node references
+- Removed dual-adapter complexity from core processors
+
+**Phase 6-9 (Configuration & Cleanup)**:
+- Updated `.env.example` and `.mcp.json` to remove all Notion configuration
+- Removed Notion test classes and updated assertions for node ID fields
+- Updated Task model (formerly NotionTask) to remove Notion-specific methods
+- Fixed all import statements and cleaned up module exports
+
+**Technical Achievements**:
+- ✅ Single storage backend (GraphRAG/Neo4j only)
+- ✅ Consistent integer node ID system
+- ✅ Unambiguous project creation with `adapter.create_project(name, description, area_node_id)`  
+- ✅ All imports and initialization working correctly
+- ✅ Claude processor successfully provides intelligent categorization with GraphRAG context
+
+**Benefits Realized**:
+- **Simplified Architecture**: One ID system, clearer data flow
+- **Improved Reliability**: No synchronization issues, consistent relationships
+- **Easier Maintenance**: Less code, simpler debugging, clearer error messages
+- **Better Performance**: Single database queries, direct relationship traversal
+
+**Migration**: Created `remove-notion-adapter` branch with comprehensive changes. System fully operational with GraphRAG-only architecture.
+
+**Next Steps**: The voice processing system is now deployment-ready with simplified, maintainable pure GraphRAG architecture. Project creation functionality works reliably for expanding knowledge graph automatically from voice input.
