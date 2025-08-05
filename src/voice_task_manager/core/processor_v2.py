@@ -17,7 +17,6 @@ from ..utils.database import VoiceDatabase
 
 # Adapters
 from ..adapters.base import TaskAdapter, TaskData
-from ..adapters.notion import NotionTaskAdapter
 from ..adapters.graphrag import GraphRAGTaskAdapter
 
 # Processors
@@ -95,9 +94,7 @@ class VoiceProcessorV2:
         # Validate required environment variables
         required_vars = ['OPENAI_API_KEY']
         
-        # Check adapter-specific requirements
-        if os.getenv('ENABLE_NOTION_ADAPTER', 'true').lower() == 'true':
-            required_vars.extend(['NOTION_TOKEN', 'NOTION_TASKS_DB'])
+        # No adapter-specific requirements for GraphRAG (MCP handles auth)
         
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         
@@ -107,34 +104,22 @@ class VoiceProcessorV2:
         self.logger.debug("Environment configuration loaded successfully")
     
     def _initialize_adapters(self) -> List[TaskAdapter]:
-        """Initialize storage adapters based on configuration"""
+        """Initialize GraphRAG storage adapter"""
         adapters = []
         
-        # Notion adapter
-        if os.getenv('ENABLE_NOTION_ADAPTER', 'true').lower() == 'true':
-            try:
-                from ..integrations.notion import NotionClient
-                notion_client = NotionClient(logger=self.logger)
-                notion_adapter = NotionTaskAdapter(notion_client=notion_client, logger=self.logger)
-                adapters.append(notion_adapter)
-                self.logger.info("Notion adapter initialized")
-            except Exception as e:
-                self.logger.error("Failed to initialize Notion adapter", exception=e)
-        
-        # GraphRAG adapter
-        if os.getenv('ENABLE_GRAPHRAG_ADAPTER', 'true').lower() == 'true':
-            try:
-                graphrag_adapter = GraphRAGTaskAdapter(logger=self.logger)
-                if graphrag_adapter.test_connection():
-                    adapters.append(graphrag_adapter)
-                    self.logger.info("GraphRAG adapter initialized")
-                else:
-                    self.logger.warning("GraphRAG adapter connection test failed")
-            except Exception as e:
-                self.logger.error("Failed to initialize GraphRAG adapter", exception=e)
+        # GraphRAG adapter (now the only storage system)
+        try:
+            graphrag_adapter = GraphRAGTaskAdapter(logger=self.logger)
+            if graphrag_adapter.test_connection():
+                adapters.append(graphrag_adapter)
+                self.logger.info("GraphRAG adapter initialized")
+            else:
+                self.logger.warning("GraphRAG adapter connection test failed")
+        except Exception as e:
+            self.logger.error("Failed to initialize GraphRAG adapter", exception=e)
         
         if not adapters:
-            raise ValueError("No storage adapters could be initialized")
+            raise ValueError("GraphRAG adapter could not be initialized")
         
         return adapters
     

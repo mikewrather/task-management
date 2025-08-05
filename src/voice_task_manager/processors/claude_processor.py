@@ -90,11 +90,11 @@ class ClaudeVoiceProcessor:
                     status=task_info.get("status", "Inbox"),
                     priority=task_info.get("priority", "Medium"),
                     contexts=task_info.get("contexts", ["voice", "auto-processed"]),
-                    project_id=project_id,
+                    project_node_id=project_id,
                     project_name=project_name,
-                    area_id=task_info.get("area_id"),
+                    area_node_id=task_info.get("area_node_id"),
                     area_name=task_info.get("area_name"),
-                    goal_id=task_info.get("goal_id"),
+                    goal_node_id=task_info.get("goal_node_id"),
                     goal_name=task_info.get("goal_name"),
                     source="voice",
                     metadata={
@@ -143,9 +143,9 @@ class ClaudeVoiceProcessor:
         projects_text = ""
         if context.get("project_patterns"):
             project_list = []
-            for proj_id, proj_info in context["project_patterns"].items():
+            for proj_node_id, proj_info in context["project_patterns"].items():
                 project_list.append(
-                    f'- {proj_info["name"]} (Area: {proj_info["area_name"]})'
+                    f'- {proj_info["name"]} (Node ID: {proj_node_id}, Area: {proj_info["area_name"]})'
                 )
             if project_list:
                 projects_text = "Available projects:\\n" + "\\n".join(project_list[:20])  # Top 20
@@ -154,8 +154,8 @@ class ClaudeVoiceProcessor:
         areas_text = ""
         if context.get("area_descriptions"):
             area_list = []
-            for area_id, area_info in context["area_descriptions"].items():
-                area_list.append(f'- {area_info["name"]}')
+            for area_node_id, area_info in context["area_descriptions"].items():
+                area_list.append(f'- {area_info["name"]} (Node ID: {area_node_id})')
             if area_list:
                 areas_text = "Available areas:\\n" + "\\n".join(area_list)
         
@@ -264,12 +264,12 @@ Return a JSON response:
             "status": "Inbox",
             "priority": "Low|Medium|High|Urgent",
             "contexts": ["voice", "auto-processed", "@location", "@tool"],
-            "project_id": "notion_id if found",
+            "project_node_id": "node_id if found",
             "project_name": "Project name if found",
-            "area_id": "notion_id if found", 
+            "area_node_id": "node_id if found", 
             "area_name": "Area name if found",
             "create_project": false,
-            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_id": "area_notion_id"}},
+            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_node_id": "area_node_id"}},
             "confidence": 0.0-1.0,
             "reasoning": "Why this categorization was chosen for this task"
         }},
@@ -279,12 +279,12 @@ Return a JSON response:
             "status": "Inbox",
             "priority": "Low|Medium|High|Urgent",
             "contexts": ["voice", "auto-processed", "@location", "@tool"],
-            "project_id": "notion_id if found",
+            "project_node_id": "node_id if found",
             "project_name": "Project name if found", 
-            "area_id": "notion_id if found",
+            "area_node_id": "node_id if found",
             "area_name": "Area name if found",
             "create_project": false,
-            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_id": "area_notion_id"}},
+            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_node_id": "area_node_id"}},
             "confidence": 0.0-1.0,
             "reasoning": "Why this categorization was chosen for this task"
         }}
@@ -470,35 +470,31 @@ Remember to:
         self.logger.info(f"Batch processing complete: {len(all_tasks)} total tasks from {len(transcripts)} transcripts")
         return all_tasks
     
-    def _create_project_if_needed(self, suggested_project: Dict[str, Any]) -> Tuple[Optional[str], Optional[str]]:
+    def _create_project_if_needed(self, suggested_project: Dict[str, Any]) -> Tuple[Optional[int], Optional[str]]:
         """
         Create a project if it doesn't exist and is deemed necessary
         
         Args:
-            suggested_project: Dict with name, description, area_id
+            suggested_project: Dict with name, description, area_node_id
             
         Returns:
-            Tuple of (project_id, project_name) if successful, (None, None) if failed
+            Tuple of (project_node_id, project_name) if successful, (None, None) if failed
         """
         project_name = suggested_project.get("name")
         project_description = suggested_project.get("description", "")
-        area_id = suggested_project.get("area_id")
+        area_node_id = suggested_project.get("area_node_id")
         
         if not project_name:
             return None, None
         
-        self.logger.info(f"Creating new project: '{project_name}' in area ID: {area_id}")
+        self.logger.info(f"Creating new project: '{project_name}' in area node ID: {area_node_id}")
         
         try:
-            # Try to create project in both adapters
-            notion_project_id = self._create_notion_project(project_name, project_description, area_id)
-            graphrag_project_id = self._create_graphrag_project(project_name, project_description, area_id)
+            # Create project in GraphRAG only
+            project_node_id = self.adapter.create_project(project_name, project_description, area_node_id)
             
-            # Return the Notion ID if available (primary), otherwise GraphRAG ID
-            if notion_project_id:
-                return notion_project_id, project_name
-            elif graphrag_project_id:
-                return graphrag_project_id, project_name
+            if project_node_id:
+                return project_node_id, project_name
             else:
                 return None, None
                 
@@ -506,78 +502,3 @@ Remember to:
             self.logger.error(f"Error creating project '{project_name}': {e}")
             return None, None
     
-    def _create_notion_project(self, name: str, description: str, area_id: Optional[str]) -> Optional[str]:
-        """Create project in Notion using MCP tools"""
-        try:
-            # Use MCP tools to create project in Notion
-            # This would need to be implemented using the notion-task-management MCP server
-            from ..adapters.notion import NotionTaskAdapter
-            
-            # Try to get a Notion adapter instance
-            # Note: This is a simplified approach - in practice you'd want better dependency injection
-            notion_adapter = NotionTaskAdapter(logger=self.logger)
-            
-            # For now, return None to indicate Notion project creation isn't implemented yet
-            # This can be implemented later when we have proper MCP project creation tools
-            self.logger.debug(f"Notion project creation not yet implemented for: {name}")
-            return None
-            
-        except Exception as e:
-            self.logger.debug(f"Notion project creation failed: {e}")
-            return None
-    
-    def _create_graphrag_project(self, name: str, description: str, area_id: Optional[str]) -> Optional[str]:
-        """Create project in GraphRAG using MCP tools"""
-        try:
-            # Create project node in GraphRAG
-            project_data = {
-                "name": name,
-                "description": description,
-                "status": "Active",
-                "created_from_voice": True
-            }
-            
-            # Create PROJECT entity
-            response = self.adapter._execute_mcp_command("create_entity", {
-                "entity_type": "PROJECT",
-                "properties": project_data
-            })
-            
-            if response and response.get("success"):
-                # Get the created project's ID
-                project_node_id = response.get("entity_id")
-                
-                # If we have an area_id, create the relationship
-                if area_id and project_node_id:
-                    self._create_project_area_relationship(project_node_id, area_id)
-                
-                self.logger.success(f"Created GraphRAG project: '{name}' (Node ID: {project_node_id})")
-                return str(project_node_id)
-            else:
-                self.logger.error(f"Failed to create project in GraphRAG: {response}")
-                return None
-                
-        except Exception as e:
-            self.logger.error(f"GraphRAG project creation failed: {e}")
-            return None
-    
-    def _create_project_area_relationship(self, project_node_id: str, area_id: str) -> bool:
-        """Create BELONGS_TO relationship between project and area"""
-        try:
-            query = f"""
-            MATCH (p:PROJECT), (a:AREA)
-            WHERE ID(p) = {project_node_id} AND (a.notion_id = '{area_id}' OR ID(a) = {area_id})
-            MERGE (p)-[:BELONGS_TO]->(a)
-            RETURN p, a
-            """
-            
-            response = self.adapter._execute_mcp_command("execute_cypher", {
-                "query": query,
-                "parameters": {}
-            })
-            
-            return response.get("success", False)
-            
-        except Exception as e:
-            self.logger.error(f"Failed to create project-area relationship: {e}")
-            return False

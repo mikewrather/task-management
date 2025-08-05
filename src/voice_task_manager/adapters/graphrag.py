@@ -208,18 +208,18 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         # Create relationships if we have project/area/goal
         if task_id:
             # Create project relationship if available
-            if task_data.project_id:
-                self._create_relationship(task_id, task_data.project_id, "BELONGS_TO", "PROJECT")
+            if task_data.project_node_id:
+                self._create_relationship(task_id, task_data.project_node_id, "BELONGS_TO", "PROJECT")
                 self.logger.info(f"Created PROJECT relationship: Task -> {task_data.project_name}")
             
             # Create area relationship if available (even without project)
-            if task_data.area_id:
-                self._create_relationship(task_id, task_data.area_id, "RELATES_TO", "AREA")
+            if task_data.area_node_id:
+                self._create_relationship(task_id, task_data.area_node_id, "RELATES_TO", "AREA")
                 self.logger.info(f"Created AREA relationship: Task -> {task_data.area_name}")
             
             # Create goal relationship if available
-            if task_data.goal_id:
-                self._create_relationship(task_id, task_data.goal_id, "CONTRIBUTES_TO", "GOAL")
+            if task_data.goal_node_id:
+                self._create_relationship(task_id, task_data.goal_node_id, "CONTRIBUTES_TO", "GOAL")
                 self.logger.info(f"Created GOAL relationship: Task -> {task_data.goal_name}")
         
         return task_id
@@ -254,8 +254,8 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         MATCH (t:TASK) WHERE ID(t) = $task_id
         OPTIONAL MATCH (t)-[:BELONGS_TO]->(p:PROJECT)
         OPTIONAL MATCH (p)-[:BELONGS_TO]->(a:AREA)
-        RETURN t, p.name as project_name, p.notion_id as project_id, 
-               a.name as area_name, a.notion_id as area_id
+        RETURN t, p.name as project_name, ID(p) as project_node_id, 
+               a.name as area_name, ID(a) as area_node_id
         """
         
         response = self._execute_mcp_command("execute_cypher", {
@@ -285,9 +285,9 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             status=task.get("status", "Inbox"),
             priority=task.get("priority", "Medium"),
             contexts=task.get("contexts", []),
-            project_id=result.get("project_id"),
+            project_node_id=result.get("project_node_id"),
             project_name=result.get("project_name"),
-            area_id=result.get("area_id"),
+            area_node_id=result.get("area_node_id"),
             area_name=result.get("area_name"),
             created_at=datetime.fromisoformat(task.get("created")) if task.get("created") else None,
             metadata={"graphrag_id": task_id}
@@ -311,7 +311,7 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         for result in results:
             if result.get("labels") and "PROJECT" in result["labels"]:
                 projects.append({
-                    "id": result.get("notion_id") or str(result.get("id")),
+                    "node_id": result.get("id"),
                     "name": result.get("name"),
                     "area_name": result.get("area_name"),
                     "status": result.get("status")
@@ -324,7 +324,7 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         cypher_query = """
         MATCH (p:PROJECT)-[:BELONGS_TO]->(a:AREA)
         WHERE toLower(p.name) CONTAINS toLower($query)
-        RETURN p.notion_id as id, p.name as name, a.name as area_name, p.status as status
+        RETURN ID(p) as node_id, p.name as name, a.name as area_name, p.status as status
         LIMIT 10
         """
         
@@ -347,7 +347,7 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         cypher_query = """
         MATCH (a:AREA)
         WHERE toLower(a.name) CONTAINS toLower($query)
-        RETURN a.notion_id as id, a.name as name, a.status as status
+        RETURN ID(a) as node_id, a.name as name, a.status as status
         LIMIT 10
         """
         
@@ -373,7 +373,7 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         WHERE t.source = 'voice' AND t.created IS NOT NULL
         OPTIONAL MATCH (t)-[:BELONGS_TO]->(p:PROJECT)
         OPTIONAL MATCH (p)-[:BELONGS_TO]->(a:AREA)
-        RETURN t.name as title, p.name as project_name, p.notion_id as project_id,
+        RETURN t.name as title, p.name as project_name, ID(p) as project_node_id,
                a.name as area_name, t.contexts as contexts
         ORDER BY t.created DESC
         LIMIT 20
@@ -387,8 +387,8 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         # Get all projects with areas
         projects_query = """
         MATCH (p:PROJECT)-[:BELONGS_TO]->(a:AREA)
-        RETURN p.notion_id as project_id, p.name as name, 
-               a.notion_id as area_id, a.name as area_name
+        RETURN ID(p) as project_node_id, p.name as name, 
+               ID(a) as area_node_id, a.name as area_name
         """
         
         projects_response = self._execute_mcp_command("execute_cypher", {
@@ -399,7 +399,7 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         # Get all areas
         areas_query = """
         MATCH (a:AREA)
-        RETURN a.notion_id as area_id, a.name as name
+        RETURN ID(a) as area_node_id, a.name as name
         """
         
         areas_response = self._execute_mcp_command("execute_cypher", {
@@ -420,18 +420,18 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         
         # Build project patterns
         for project in projects_results:
-            if project.get("project_id"):
-                context["project_patterns"][project["project_id"]] = {
+            if project.get("project_node_id"):
+                context["project_patterns"][project["project_node_id"]] = {
                     "name": project["name"],
-                    "area_id": project.get("area_id"),
+                    "area_node_id": project.get("area_node_id"),
                     "area_name": project.get("area_name", ""),
                     "keywords": self._extract_keywords(project["name"])
                 }
         
         # Build area descriptions
         for area in areas_results:
-            if area.get("area_id"):
-                context["area_descriptions"][area["area_id"]] = {
+            if area.get("area_node_id"):
+                context["area_descriptions"][area["area_node_id"]] = {
                     "name": area["name"],
                     "keywords": self._extract_keywords(area["name"])
                 }
@@ -480,12 +480,12 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         
         return context
     
-    def _create_relationship(self, from_id: str, to_id: str, 
+    def _create_relationship(self, from_id: str, to_node_id: int, 
                            relationship_type: str, to_label: str) -> bool:
         """Create a relationship between entities"""
         query = f"""
         MATCH (from), (to:{to_label})
-        WHERE ID(from) = {from_id} AND to.notion_id = '{to_id}'
+        WHERE ID(from) = {from_id} AND ID(to) = {to_node_id}
         MERGE (from)-[:{relationship_type}]->(to)
         RETURN from, to
         """
@@ -496,6 +496,47 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         })
         
         return response.get("success", False)
+    
+    def create_project(self, name: str, description: str, area_node_id: Optional[int] = None) -> Optional[int]:
+        """
+        Create a new project and optionally link to existing area
+        
+        Args:
+            name: Project name
+            description: Project description  
+            area_node_id: Node ID of area to link to (optional)
+            
+        Returns:
+            New project's node ID if successful, None if failed
+        """
+        # Create the project entity
+        project_properties = {
+            "entity_type": "PROJECT",
+            "properties": {
+                "name": name,
+                "description": description or "",
+                "status": "Active",
+                "created_from_voice": True
+            }
+        }
+        
+        # Create PROJECT entity
+        response = self._execute_mcp_command("create_entity", project_properties)
+        
+        if not response.get("success"):
+            self.logger.error(f"Failed to create project in GraphRAG: {response.get('error')}")
+            return None
+        
+        # Get the created project's ID
+        project_node_id = response.get("entity", {}).get("id")
+        
+        # If we have an area_node_id, create the relationship
+        if area_node_id and project_node_id:
+            self._create_relationship(str(project_node_id), area_node_id, "BELONGS_TO", "AREA")
+            self.logger.info(f"Created BELONGS_TO relationship: Project -> Area")
+        
+        self.logger.success(f"Created GraphRAG project: '{name}' (Node ID: {project_node_id})")
+        return project_node_id
     
     def _extract_keywords(self, text: str) -> List[str]:
         """Extract keywords from text for matching"""

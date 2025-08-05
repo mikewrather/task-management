@@ -15,7 +15,7 @@ console = Console()
 @click.option('--verbose', '-v', is_flag=True, help='Enable verbose output')
 @click.pass_context
 def main(ctx: click.Context, verbose: bool) -> None:
-    """Voice Task Manager - Automated voice recording to Notion task conversion"""
+    """Voice Task Manager - Automated voice recording to GraphRAG task conversion"""
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
     
