@@ -1,6 +1,6 @@
 # Voice Task Manager
 
-A modern Python package that automatically converts voice recordings into organized Notion tasks with intelligent categorization. Features multi-adapter storage (Notion + GraphRAG), comprehensive testing, and a clean architecture following Python best practices.
+A modern Python package that automatically converts voice recordings into organized tasks with intelligent categorization using GraphRAG/Neo4j knowledge graphs. Features pure GraphRAG storage, comprehensive testing, and a clean architecture following Python best practices.
 
 ## 🚀 Quick Start
 
@@ -56,7 +56,7 @@ flowchart TB
 
 ### 🏗️ Modern Architecture
 - **Clean Package Structure** - `src/` layout following Python best practices
-- **Multi-Adapter Pattern** - Pluggable storage backends (Notion, GraphRAG)
+- **GraphRAG Architecture** - Pure Neo4j knowledge graph storage
 - **Comprehensive Testing** - Unit, integration, and E2E test suites
 - **UV Package Manager** - Fast, reliable dependency management
 
@@ -66,16 +66,13 @@ flowchart TB
 - **Duplicate Prevention** - SQLite tracking ensures no duplicate processing
 - **Error Recovery** - Robust error handling and retry logic
 
-### 📋 Notion Integration
-- **7 Entity Types** - Tasks, Projects, Areas, Goals, Notes, Events, References
+### 🕸️ GraphRAG Knowledge Graph
+- **4 Core Entities** - Tasks, Projects, Areas, Goals with rich relationships
 - **PARA Method** - Automatic organization following productivity best practices
-- **Full CRUD Operations** - Create, read, update, delete for all entities
-- **MCP Server** - 9 tools for comprehensive Notion interaction
-
-### 🧠 GraphRAG Integration
-- **Knowledge Graph** - Neo4j-based relationship mapping
-- **Semantic Search** - Find related tasks and concepts
-- **Context Preservation** - Maintains relationships between entities
+- **Neo4j Storage** - Direct graph database operations with semantic relationships
+- **MCP Server** - Agent-db server for comprehensive graph operations
+- **Semantic Search** - Find related tasks and concepts using natural language
+- **Context Preservation** - Maintains relationships between entities automatically
 - **Future-Ready** - Prepared for advanced AI features
 
 ## 📁 Project Structure
@@ -83,9 +80,9 @@ flowchart TB
 ```
 task-management/
 ├── src/voice_task_manager/     # Main package (following src layout)
-│   ├── adapters/              # Storage adapters (Notion, GraphRAG)
+│   ├── adapters/              # Storage adapters (GraphRAG)
 │   ├── core/                  # Core business logic
-│   ├── integrations/          # External services (Drive, Whisper, Notion)
+│   ├── integrations/          # External services (Drive, Whisper)
 │   ├── models/                # Data models for all entities
 │   ├── processors/            # AI processing (Claude)
 │   └── utils/                 # Utility functions
@@ -105,8 +102,8 @@ task-management/
 ### Prerequisites
 - Python 3.10+
 - UV package manager (recommended) or pip
-- API Keys: OpenAI, Notion, Google Drive credentials
-- Optional: Neo4j for GraphRAG features
+- API Keys: OpenAI, Anthropic (Claude), Google Drive credentials
+- Neo4j database for GraphRAG knowledge graph
 
 ### Detailed Setup
 
@@ -214,14 +211,15 @@ crontab -e
 
 ## 🎛️ MCP Inspector Dashboard
 
-Interactive visual testing tool for the Notion MCP server:
+Interactive visual testing tool for the GraphRAG agent-db MCP server:
 
 ```bash
-# Start MCP Inspector
-npx @modelcontextprotocol/inspector notion_mcp_server.py
+# Start MCP Inspector for agent-db server
+# Configure with .mcp.json to test GraphRAG operations
+npx @modelcontextprotocol/inspector
 
 # Or use the convenience script
-./scripts/start-mcp-inspector.sh
+./scripts/demo-mcp-inspector.sh
 ```
 
 **Available Tools:**
