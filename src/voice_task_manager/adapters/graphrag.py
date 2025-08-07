@@ -21,7 +21,7 @@ class GraphRAGTaskAdapter(TaskAdapter):
         """
         self.logger = logger or VoiceLogger()
         self.claude_project = "task-management"
-        self.use_real_mcp = os.getenv('USE_REAL_MCP', 'false').lower() == 'true'
+        self.use_real_mcp = os.getenv('USE_REAL_MCP', 'true').lower() == 'true'
         
     def _execute_mcp_command(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -50,7 +50,13 @@ class GraphRAGTaskAdapter(TaskAdapter):
                     return {"success": False, "error": f"Unknown tool: {tool_name}"}
                 
                 # Create a prompt that will make Claude use the MCP tool
-                prompt = f"""Use the {mcp_tool_name} tool with these exact parameters:
+                if tool_name == "execute_cypher":
+                    # Use simple format that works
+                    query = parameters.get("query", "")
+                    prompt = f'Use the {mcp_tool_name} tool with this exact query: "{query}"'
+                else:
+                    # Use JSON format for other tools
+                    prompt = f"""Use the {mcp_tool_name} tool with these exact parameters:
 {json.dumps(parameters, indent=2)}
 
 Return ONLY the raw JSON result from the tool, with no additional text or formatting."""
@@ -61,12 +67,12 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                 original_cwd = os.getcwd()
                 project_dir = "/home/mike/development/task-management"
                 
-                claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+                claude_path = "/home/mike/.claude/local/claude"
                 cmd = [
                     claude_path, 
                     "-p", prompt,
                     "--dangerously-skip-permissions",
-                    "--mcp-config", f"{project_dir}/.mcp.json",
+                    "--mcp-config", ".mcp.json",
                     "--mcp-debug",  # Add debug flag for better MCP troubleshooting
                     "--output-format", "json"
                 ]
@@ -102,10 +108,32 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                         if isinstance(claude_response, dict) and 'result' in claude_response:
                             # Extract the result field which contains the actual response
                             result_content = claude_response['result']
-                            # Remove markdown code block if present
+                            
+                            # Check if it's already JSON
                             if result_content.startswith('```json') and result_content.endswith('```'):
                                 result_content = result_content[7:-3].strip()
-                            response = json.loads(result_content)
+                                response = json.loads(result_content)
+                            elif result_content.startswith('{') and result_content.endswith('}'):
+                                response = json.loads(result_content)
+                            else:
+                                # Handle text responses for execute_cypher
+                                if tool_name == "execute_cypher":
+                                    # Only use text parser for simple count queries
+                                    query = parameters.get("query", "").lower()
+                                    if "count(" in query and "return" in query and len(query.split("return")[1].split(",")) == 1:
+                                        response = self._parse_cypher_text_response(result_content, parameters)
+                                    else:
+                                        # For complex queries, check if the text indicates success
+                                        if any(success_phrase in result_content.lower() for success_phrase in [
+                                            "successfully", "executed successfully", "created", "updated", "deleted"
+                                        ]):
+                                            response = {"success": True, "result": result_content}
+                                        else:
+                                            response = {"success": False, "error": f"Complex query returned text: {result_content[:200]}..."}
+                                else:
+                                    # For other tools, try to extract JSON or return text
+                                    response = {"success": True, "result": result_content}
+                            
                             self.logger.success(f"Real MCP execution successful for {tool_name}")
                             return response
                     except (json.JSONDecodeError, KeyError):
@@ -544,3 +572,46 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         stopwords = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for'}
         keywords = [w for w in words if w not in stopwords and len(w) > 2]
         return keywords
+    
+    def _parse_cypher_text_response(self, text_response: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse text response from Cypher queries into expected format"""
+        import re
+        
+        # Extract numbers from the text response
+        numbers = re.findall(r'\b(\d+)\b', text_response)
+        
+        if not numbers:
+            return {"success": True, "records": []}
+        
+        # Get the query to determine what field name to use
+        query = parameters.get("query", "").lower()
+        
+        # Map common query patterns to field names
+        if "count(n)" in query:
+            if "task" in query:
+                field_name = "task_count"
+            elif "project" in query:
+                field_name = "project_count"
+            elif "area" in query:
+                field_name = "area_count"
+            elif "goal" in query:
+                field_name = "goal_count"
+            else:
+                field_name = "total_nodes"
+        elif "count(r)" in query:
+            field_name = "total_relationships"
+        else:
+            # Default field name based on common patterns
+            if "orphaned" in query:
+                if "orphaned_count" in query:
+                    field_name = "orphaned_count"
+                else:
+                    field_name = "orphaned_tasks"
+            else:
+                field_name = "count"
+        
+        # Return in expected format
+        return {
+            "success": True,
+            "records": [{field_name: int(numbers[0])}]
+        }

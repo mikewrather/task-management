@@ -153,7 +153,7 @@ class ClaudeSessionManager:
         """
         try:
             # Simple test command
-            claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+            claude_path = "/home/mike/.claude/local/claude"
             cmd = [
                 claude_path,
                 "-p", "Return only: OK",

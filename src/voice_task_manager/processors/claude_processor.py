@@ -313,7 +313,7 @@ REMEMBER: Your goal is to create a well-connected knowledge graph. Every task sh
         try:
             # Use Claude with project context and MCP access
             # Use full path to claude command
-            claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+            claude_path = "/home/mike/.claude/local/claude"
             
             # Add instruction to use MCP tools
             full_prompt = f"""{prompt}

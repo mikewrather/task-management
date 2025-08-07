@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Voice Task Management system that automatically converts voice recordings into organized Notion tasks using a multi-adapter architecture supporting both Notion and GraphRAG (Neo4j) storage backends. The system integrates Google Drive, OpenAI Whisper, Claude AI, and MCP (Model Context Protocol) servers.
+This is a Voice Task Management system that automatically converts voice recordings into organized tasks using pure GraphRAG (Neo4j) knowledge graph storage. The system integrates Google Drive, OpenAI Whisper, Claude AI, and MCP (Model Context Protocol) servers.
 
 ## Python Best Practices & Structure
 
@@ -80,14 +80,13 @@ mcp dev notion_mcp_server.py
 
 ### Core Components
 
-1. **Multi-Adapter Architecture** (`src/voice_task_manager/adapters/`)
+1. **GraphRAG Storage Architecture** (`src/voice_task_manager/adapters/`)
    - `base.py`: Defines TaskAdapter interface and TaskData model
-   - `notion.py`: Notion API integration for task storage
    - `graphrag.py`: GraphRAG/Neo4j integration for knowledge graph storage
-   - Both adapters can run simultaneously based on `.env` configuration
+   - Pure GraphRAG implementation for all task storage
 
 2. **Voice Processing Pipeline** (`src/voice_task_manager/core/processor_v2.py`)
-   - Enhanced processor supporting multiple storage adapters
+   - Enhanced processor with GraphRAG storage integration
    - Processes voice files through: Discovery → Download → Transcription → AI Analysis → Task Creation
    - Handles file cleanup and state management
 
@@ -98,7 +97,6 @@ mcp dev notion_mcp_server.py
 
 4. **MCP Servers** (`.mcp.json`)
    - **agent-db**: GraphRAG database operations via Neo4j
-   - **notion-task-management**: Custom Notion operations server
 
 ### Database Schema
 
@@ -129,13 +127,14 @@ cmd = [
 result = subprocess.run(cmd, timeout=None, capture_output=True, text=True)
 ```
 
-### Adapter Configuration
+### GraphRAG Configuration
 
 In `.env`:
 ```bash
-# Enable/disable adapters
-ENABLE_NOTION_ADAPTER=true
-ENABLE_GRAPHRAG_ADAPTER=true
+# GraphRAG Configuration (Required)
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password
 
 # Use real MCP vs mock implementation
 USE_REAL_MCP=true  # Set to false for testing without MCP servers

@@ -33,6 +33,7 @@ Examples:
 import argparse
 import sys
 import json
+import os
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -40,6 +41,14 @@ from datetime import datetime
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv(project_root / ".env")
+except ImportError:
+    # dotenv not available, environment should be set manually
+    pass
 
 from voice_task_manager.utils.relationship_analyzer import RelationshipAnalyzer, TaskRelationship, DuplicateTaskPair
 from voice_task_manager.utils.logging import VoiceLogger
@@ -345,18 +354,93 @@ class RelationshipCleanupTool:
         return result
     
     def _apply_relationship_fix(self, task: TaskRelationship) -> bool:
-        """Apply relationship fixes for a task"""
-        # This is a placeholder - actual implementation would depend on the adapters
-        # For now, we'll simulate the fix
+        """Apply relationship fixes for a task by creating actual graph relationships"""
         self.logger.debug(f"Applying relationship fix for task {task.task_id}")
         
-        # TODO: Implement actual relationship updates using MCP tools
-        # Would need to:
-        # 1. Update task relationships in GraphRAG
-        # 2. Update task relationships in Notion
-        # 3. Create missing project/area relationships
+        success = True
         
-        return True  # Simulated success
+        try:
+            # Create project relationship if suggested
+            if task.suggested_project_id:
+                success &= self._create_project_relationship(task.task_id, task.suggested_project_id, task.suggested_project_name)
+            
+            # Create area relationship if suggested
+            if task.suggested_area_id:
+                success &= self._create_area_relationship(task.task_id, task.suggested_area_id, task.suggested_area_name)
+            
+            return success
+            
+        except Exception as e:
+            self.logger.error(f"Error applying relationship fix for task {task.task_id}: {e}")
+            return False
+    
+    def _create_project_relationship(self, task_id: str, project_id: str, project_name: str) -> bool:
+        """Create BELONGS_TO relationship between task and project"""
+        try:
+            # Use the analyzer's GraphRAG adapter to execute Cypher
+            if not self.analyzer.graphrag_adapter:
+                self.logger.error("No GraphRAG adapter available")
+                return False
+            
+            project_query = """
+            MATCH (t:TASK), (p:PROJECT)
+            WHERE ID(t) = $task_id AND ID(p) = $project_id
+            MERGE (t)-[:BELONGS_TO]->(p)
+            RETURN t.name as task_name, p.name as project_name
+            """
+            
+            response = self.analyzer.graphrag_adapter._execute_mcp_command("execute_cypher", {
+                "query": project_query,
+                "parameters": {
+                    "task_id": int(task_id),
+                    "project_id": int(project_id)
+                }
+            })
+            
+            if response and response.get("success"):
+                self.logger.info(f"Created BELONGS_TO relationship: Task -> {project_name}")
+                return True
+            else:
+                self.logger.error(f"Failed to create project relationship: {response}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error creating project relationship: {e}")
+            return False
+    
+    def _create_area_relationship(self, task_id: str, area_id: str, area_name: str) -> bool:
+        """Create RELATES_TO relationship between task and area"""
+        try:
+            # Use the analyzer's GraphRAG adapter to execute Cypher
+            if not self.analyzer.graphrag_adapter:
+                self.logger.error("No GraphRAG adapter available")
+                return False
+            
+            area_query = """
+            MATCH (t:TASK), (a:AREA)
+            WHERE ID(t) = $task_id AND ID(a) = $area_id
+            MERGE (t)-[:RELATES_TO]->(a)
+            RETURN t.name as task_name, a.name as area_name
+            """
+            
+            response = self.analyzer.graphrag_adapter._execute_mcp_command("execute_cypher", {
+                "query": area_query,
+                "parameters": {
+                    "task_id": int(task_id),
+                    "area_id": int(area_id)
+                }
+            })
+            
+            if response and response.get("success"):
+                self.logger.info(f"Created RELATES_TO relationship: Task -> {area_name}")
+                return True
+            else:
+                self.logger.error(f"Failed to create area relationship: {response}")
+                return False
+                
+        except Exception as e:
+            self.logger.error(f"Error creating area relationship: {e}")
+            return False
     
     def _merge_duplicate_tasks(self, task1_id: str, task2_id: str) -> bool:
         """Merge two duplicate tasks"""

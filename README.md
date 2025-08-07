@@ -1,6 +1,6 @@
 # Voice Task Manager
 
-A modern Python package that automatically converts voice recordings into organized tasks with intelligent categorization using GraphRAG/Neo4j knowledge graphs. Features pure GraphRAG storage, comprehensive testing, and a clean architecture following Python best practices.
+A modern Python package that automatically converts voice recordings into organized tasks using pure GraphRAG/Neo4j knowledge graphs. Features intelligent AI categorization, comprehensive testing, and a clean architecture following Python best practices.
 
 ## 🚀 Quick Start
 
@@ -37,8 +37,7 @@ flowchart TB
     Discovery["🔍 File Discovery"]
     Whisper["🎯 Whisper Transcription"]
     Claude["🤖 Claude AI Categorization"]
-    Storage["💾 Multi-Adapter Storage"]
-    Notion["📋 Notion<br/>(7 Entity Types)"]
+    Storage["💾 GraphRAG Storage"]
     GraphRAG["🧠 GraphRAG<br/>(Knowledge Graph)"]
     SQLite["🗄️ SQLite Tracking"]
     
@@ -47,7 +46,6 @@ flowchart TB
     Discovery --> Whisper
     Whisper --> Claude
     Claude --> Storage
-    Storage --> Notion
     Storage --> GraphRAG
     Storage --> SQLite
 ```
@@ -80,7 +78,7 @@ flowchart TB
 ```
 task-management/
 ├── src/voice_task_manager/     # Main package (following src layout)
-│   ├── adapters/              # Storage adapters (GraphRAG)
+│   ├── adapters/              # GraphRAG storage adapter
 │   ├── core/                  # Core business logic
 │   ├── integrations/          # External services (Drive, Whisper)
 │   ├── models/                # Data models for all entities
@@ -134,22 +132,15 @@ task-management/
    ```env
    # Core APIs
    OPENAI_API_KEY=sk-...
-   NOTION_TOKEN=secret_...
-   NOTION_TASKS_DB=...
-   NOTION_PROJECTS_DB=...
-   NOTION_AREAS_DB=...
-   # ... other Notion DBs
+   ANTHROPIC_API_KEY=sk-ant-...
    
    # Google Drive
    GOOGLE_DRIVE_FOLDER_ID=...
    
-   # GraphRAG (Optional)
+   # GraphRAG (Required)
    NEO4J_URI=bolt://localhost:7687
    NEO4J_USER=neo4j
    NEO4J_PASSWORD=...
-   
-   # Claude API
-   ANTHROPIC_API_KEY=sk-ant-...
    ```
 
 4. **Verify Installation**

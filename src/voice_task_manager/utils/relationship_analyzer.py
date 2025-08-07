@@ -102,23 +102,146 @@ class RelationshipAnalyzer:
         self.logger.info("Starting orphaned task analysis...")
         orphaned_tasks = []
         
-        # Get all tasks from available adapters
-        all_tasks = self._get_all_tasks()
+        # Get actual orphaned task details
+        if self.graphrag_adapter:
+            try:
+                # First get count of orphaned tasks
+                count_query = """
+                MATCH (t:TASK)
+                WHERE NOT (t)-[:BELONGS_TO]->() 
+                AND NOT (t)-[:CONTRIBUTES_TO]->()
+                RETURN count(t) as orphaned_count
+                """
+                
+                count_response = self.graphrag_adapter._execute_mcp_command("execute_cypher", {
+                    "query": count_query,
+                    "parameters": {}
+                })
+                
+                if count_response and count_response.get("success"):
+                    records = count_response.get("records", [])
+                    if records:
+                        orphan_count = records[0].get("orphaned_count", 0)
+                        self.logger.info(f"Found {orphan_count} orphaned tasks")
+                        
+                        # Use natural language query to get task details
+                        if orphan_count > 0:
+                            orphaned_tasks = self._get_orphaned_task_details_via_nl(min_confidence, min(orphan_count, 20))
+                        
+                else:
+                    self.logger.warning("Failed to get orphan count")
+                        
+            except Exception as e:
+                self.logger.error(f"Error finding orphaned tasks: {e}")
         
-        for task in all_tasks:
-            # Check if task is orphaned (missing key relationships)
-            is_orphaned = (
-                not task.get("project_id") or 
-                not task.get("area_id")
-            )
+        self.logger.info(f"Found {len(orphaned_tasks)} orphaned tasks with suggestions")
+        return orphaned_tasks
+    
+    def _analyze_and_suggest_relationships(self, task_record: Dict[str, Any], min_confidence: float) -> Optional[TaskRelationship]:
+        """
+        Analyze a task and suggest relationships using intelligent matching
+        
+        Args:
+            task_record: Task data from Neo4j
+            min_confidence: Minimum confidence threshold
             
-            if is_orphaned:
-                # Analyze task for relationship suggestions
-                relationship = self._analyze_task_relationships(task, min_confidence)
-                if relationship:
-                    orphaned_tasks.append(relationship)
+        Returns:
+            TaskRelationship with suggestions or None if confidence too low
+        """
+        task_name = task_record.get('name', '')
+        task_description = task_record.get('description', '')
+        task_contexts = task_record.get('contexts', [])
         
-        self.logger.info(f"Found {len(orphaned_tasks)} orphaned tasks")
+        # Build search context from task content
+        search_content = f"{task_name} {task_description}"
+        if task_contexts:
+            search_content += f" {' '.join(task_contexts)}"
+        
+        # Get available entities for matching
+        entities_context = self._get_available_entities_context()
+        
+        # Find best project match
+        suggested_project = self._find_best_project_match_enhanced(search_content, entities_context)
+        
+        # Find best area match
+        suggested_area = self._find_best_area_match_enhanced(search_content, entities_context)
+        
+        # Calculate confidence based on matches
+        confidence = self._calculate_relationship_confidence_enhanced(
+            search_content, suggested_project, suggested_area
+        )
+        
+        if confidence >= min_confidence:
+            return TaskRelationship(
+                task_id=str(task_record['task_id']),
+                task_name=task_name,
+                description=task_description,
+                suggested_project_id=suggested_project.get('id') if suggested_project else None,
+                suggested_project_name=suggested_project.get('name') if suggested_project else None,
+                suggested_area_id=suggested_area.get('id') if suggested_area else None,
+                suggested_area_name=suggested_area.get('name') if suggested_area else None,
+                confidence=confidence,
+                reasoning=self._generate_relationship_reasoning_enhanced(
+                    search_content, suggested_project, suggested_area
+                )
+            )
+        
+        return None
+    
+    def _get_orphaned_task_details_via_nl(self, min_confidence: float, limit: int) -> List[TaskRelationship]:
+        """
+        Get orphaned task details using natural language query
+        
+        Args:
+            min_confidence: Minimum confidence threshold
+            limit: Maximum number of tasks to retrieve
+            
+        Returns:
+            List of TaskRelationship objects for orphaned tasks
+        """
+        orphaned_tasks = []
+        
+        try:
+            # Use natural language query to find orphaned tasks
+            nl_response = self.graphrag_adapter._execute_mcp_command("query_natural_language", {
+                "query": f"Find the first {limit} tasks that have no relationships to projects or areas, including their names, descriptions, and any context information",
+                "max_results": limit
+            })
+            
+            if nl_response and nl_response.get("success"):
+                # The response might be in different formats
+                results = nl_response.get("results", [])
+                if isinstance(results, list):
+                    for result in results:
+                        if isinstance(result, dict):
+                            # Try to extract task information
+                            task_name = result.get("name", "")
+                            if not task_name:
+                                # Look for title or other name fields
+                                task_name = result.get("title", result.get("task_name", "Unknown Task"))
+                            
+                            # Create a simplified task record
+                            task_record = {
+                                "task_id": result.get("id", result.get("node_id", "unknown")),
+                                "name": task_name,
+                                "description": result.get("description", ""),
+                                "contexts": result.get("contexts", []),
+                                "created": result.get("created", ""),
+                                "source": result.get("source", "unknown")
+                            }
+                            
+                            # Analyze and suggest relationships
+                            task_relationship = self._analyze_and_suggest_relationships(task_record, min_confidence)
+                            if task_relationship:
+                                orphaned_tasks.append(task_relationship)
+                
+                self.logger.info(f"Retrieved {len(orphaned_tasks)} orphaned tasks via natural language query")
+            else:
+                self.logger.warning("Natural language query for orphaned tasks failed")
+                
+        except Exception as e:
+            self.logger.error(f"Error getting orphaned task details via NL: {e}")
+        
         return orphaned_tasks
     
     def find_duplicate_tasks(self, similarity_threshold: float = 0.8) -> List[DuplicateTaskPair]:
@@ -199,44 +322,65 @@ class RelationshipAnalyzer:
         return all_tasks
     
     def _get_graphrag_tasks(self) -> List[Dict[str, Any]]:
-        """Get all tasks from GraphRAG"""
+        """Get all tasks from GraphRAG using natural language query"""
         if not self.graphrag_adapter:
             return []
         
-        query = """
-        MATCH (t:TASK)
-        OPTIONAL MATCH (t)-[:BELONGS_TO]->(p:PROJECT)
-        OPTIONAL MATCH (t)-[:BELONGS_TO]->(a:AREA)
-        OPTIONAL MATCH (t)-[:CONTRIBUTES_TO]->(g:GOAL)
-        RETURN t, p, a, g
-        """
-        
-        response = self.graphrag_adapter._execute_mcp_command("execute_cypher", {
-            "query": query,
-            "parameters": {}
+        # Use natural language query which works better than complex Cypher
+        response = self.graphrag_adapter._execute_mcp_command("query_natural_language", {
+            "query": "Find all tasks with their relationships to projects, areas, and goals",
+            "max_results": 50
         })
         
         tasks = []
         if response and response.get("success"):
-            for record in response.get("results", []):
-                task_data = record.get("t", {})
-                project_data = record.get("p", {})
-                area_data = record.get("a", {})
-                goal_data = record.get("g", {})
-                
-                task = {
-                    "id": str(task_data.get("notion_id", task_data.get("id", ""))),
-                    "name": task_data.get("name", ""),
-                    "description": task_data.get("description", ""),
-                    "project_id": project_data.get("notion_id") if project_data else None,
-                    "project_name": project_data.get("name") if project_data else None,
-                    "area_id": area_data.get("notion_id") if area_data else None,
-                    "area_name": area_data.get("name") if area_data else None,
-                    "goal_id": goal_data.get("notion_id") if goal_data else None,
-                    "goal_name": goal_data.get("name") if goal_data else None,
-                    "source": "graphrag"
-                }
-                tasks.append(task)
+            # Parse the natural language response
+            # Since this returns text, we need to extract task info differently
+            # For now, let's use a simpler approach with separate queries
+            
+            # Get count of tasks
+            count_response = self.graphrag_adapter._execute_mcp_command("execute_cypher", {
+                "query": "MATCH (t:TASK) RETURN count(t) as task_count",
+                "parameters": {}
+            })
+            
+            if count_response and count_response.get("success"):
+                records = count_response.get("records", [])
+                if records:
+                    task_count = records[0].get("task_count", 0)
+                    
+                    # For each task, check relationships using simple queries
+                    for i in range(min(task_count, 50)):  # Limit to 50 tasks for performance
+                        # Get orphaned tasks specifically
+                        orphan_response = self.graphrag_adapter._execute_mcp_command("execute_cypher", {
+                            "query": """
+                            MATCH (t:TASK)
+                            WHERE NOT (t)-[:BELONGS_TO]->() 
+                            AND NOT (t)-[:CONTRIBUTES_TO]->()
+                            RETURN t.name as name, t.description as description, t.node_id as id
+                            LIMIT 20
+                            """,
+                            "parameters": {}
+                        })
+                        
+                        if orphan_response and orphan_response.get("success"):
+                            orphan_records = orphan_response.get("records", [])
+                            for record in orphan_records:
+                                if isinstance(record, dict):
+                                    task = {
+                                        "id": str(record.get("id", "")),
+                                        "name": record.get("name", ""),
+                                        "description": record.get("description", ""),
+                                        "project_id": None,  # Orphaned, so no relationships
+                                        "project_name": None,
+                                        "area_id": None,
+                                        "area_name": None,  
+                                        "goal_id": None,
+                                        "goal_name": None,
+                                        "source": "graphrag"
+                                    }
+                                    tasks.append(task)
+                        break  # Only need to do this once, not in a loop
         
         return tasks
     
@@ -467,3 +611,147 @@ class RelationshipAnalyzer:
             return "review"
         else:
             return "keep_both"
+    
+    def _get_available_entities_context(self) -> Dict[str, List[Dict]]:
+        """
+        Get all available projects and areas for relationship matching
+        
+        Returns:
+            Dictionary with 'projects' and 'areas' lists containing entity data
+        """
+        if not self.graphrag_adapter:
+            return {"projects": [], "areas": []}
+        
+        try:
+            # Use natural language queries to get entities - more reliable than complex Cypher
+            projects = []
+            areas = []
+            
+            # Get projects
+            projects_response = self.graphrag_adapter._execute_mcp_command("query_natural_language", {
+                "query": "Find all projects and their associated areas, including project names, descriptions, and area names",
+                "max_results": 50
+            })
+            
+            if projects_response and projects_response.get("success"):
+                results = projects_response.get("results", [])
+                if isinstance(results, list):
+                    for result in results:
+                        if isinstance(result, dict) and "PROJECT" in result.get("labels", []):
+                            projects.append({
+                                "id": result.get("id", result.get("node_id")),
+                                "name": result.get("name", ""),
+                                "description": result.get("description", ""),
+                                "area_id": result.get("area_id"),
+                                "area_name": result.get("area_name", "")
+                            })
+            
+            # Get areas  
+            areas_response = self.graphrag_adapter._execute_mcp_command("query_natural_language", {
+                "query": "Find all areas including their names and descriptions",
+                "max_results": 50
+            })
+            
+            if areas_response and areas_response.get("success"):
+                results = areas_response.get("results", [])
+                if isinstance(results, list):
+                    for result in results:
+                        if isinstance(result, dict) and "AREA" in result.get("labels", []):
+                            areas.append({
+                                "id": result.get("id", result.get("node_id")),
+                                "name": result.get("name", ""),
+                                "description": result.get("description", "")
+                            })
+            
+            self.logger.debug(f"Found {len(projects)} projects and {len(areas)} areas")
+            return {"projects": projects, "areas": areas}
+            
+        except Exception as e:
+            self.logger.error(f"Error getting entities context: {e}")
+            return {"projects": [], "areas": []}
+    
+    def _find_best_project_match_enhanced(self, search_content: str, entities_context: Dict) -> Optional[Dict]:
+        """Find the best matching project using enhanced similarity"""
+        projects = entities_context.get("projects", [])
+        if not projects:
+            return None
+        
+        best_match = None
+        best_score = 0.0
+        
+        for project in projects:
+            project_text = f"{project['name']} {project.get('description', '')} {project.get('area_name', '')}"
+            score = self._calculate_semantic_similarity(search_content.lower(), project_text.lower())
+            
+            if score > best_score:
+                best_score = score
+                best_match = {
+                    "id": project["id"],
+                    "name": project["name"],
+                    "description": project.get("description", ""),
+                    "area_name": project.get("area_name", ""),
+                    "score": score
+                }
+        
+        return best_match if best_score > 0.3 else None
+    
+    def _find_best_area_match_enhanced(self, search_content: str, entities_context: Dict) -> Optional[Dict]:
+        """Find the best matching area using enhanced similarity"""
+        areas = entities_context.get("areas", [])
+        if not areas:
+            return None
+        
+        best_match = None
+        best_score = 0.0
+        
+        for area in areas:
+            area_text = f"{area['name']} {area.get('description', '')}"
+            score = self._calculate_semantic_similarity(search_content.lower(), area_text.lower())
+            
+            if score > best_score:
+                best_score = score
+                best_match = {
+                    "id": area["id"],
+                    "name": area["name"],
+                    "description": area.get("description", ""),
+                    "score": score
+                }
+        
+        return best_match if best_score > 0.2 else None
+    
+    def _calculate_relationship_confidence_enhanced(self, task_content: str, suggested_project: Optional[Dict], suggested_area: Optional[Dict]) -> float:
+        """Calculate confidence score for relationship suggestions with enhanced weighting"""
+        confidence = 0.0
+        
+        if suggested_project:
+            project_score = suggested_project.get("score", 0.0)
+            confidence += project_score * 0.6  # Project matches weighted higher
+        
+        if suggested_area:
+            area_score = suggested_area.get("score", 0.0)
+            confidence += area_score * 0.4  # Area matches weighted lower
+        
+        # Boost confidence if we have both project and area suggestions
+        if suggested_project and suggested_area:
+            confidence *= 1.1  # 10% boost for having both relationships
+        
+        return min(confidence, 1.0)
+    
+    def _generate_relationship_reasoning_enhanced(self, task_content: str, suggested_project: Optional[Dict], suggested_area: Optional[Dict]) -> str:
+        """Generate detailed reasoning for relationship suggestions"""
+        reasons = []
+        
+        if suggested_project:
+            score = suggested_project.get("score", 0.0)
+            reasons.append(f"Project '{suggested_project['name']}' matches with {score:.1%} similarity")
+            if suggested_project.get("area_name"):
+                reasons.append(f"in area '{suggested_project['area_name']}'")
+        
+        if suggested_area and not (suggested_project and suggested_project.get("area_name")):
+            score = suggested_area.get("score", 0.0)
+            reasons.append(f"Area '{suggested_area['name']}' matches with {score:.1%} similarity")
+        
+        if not reasons:
+            reasons.append("No strong semantic matches found")
+        
+        return "; ".join(reasons)
