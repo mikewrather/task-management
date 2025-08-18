@@ -39,8 +39,8 @@ class GraphRAGTaskAdapter(TaskAdapter):
             try:
                 # Build prompt for Claude to execute the MCP tool
                 tool_mapping = {
-                    "create_entity": "mcp__agent-db__create_entity",
-                    "execute_cypher": "mcp__agent-db__execute_cypher",
+                    "create_entities": "mcp__agent-db__create_entities",  # Fixed: plural form
+                    "execute_cypher": "mcp__agent-db__query_with_cypher",  # Fixed: correct tool name
                     "query_natural_language": "mcp__agent-db__query_natural_language",
                     "get_health_status": "mcp__agent-db__get_health_status"
                 }
@@ -171,14 +171,14 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         self.logger.warning(f"Mock MCP execution for {tool_name}")
         
         # Simulate successful responses for testing
-        if tool_name == "create_entity":
+        if tool_name == "create_entities":
             return {
                 "success": True,
-                "entity": {
+                "entities": [{
                     "id": f"mock_{datetime.now().timestamp()}",
                     "type": parameters.get("entity_type"),
-                    "properties": parameters.get("properties", {})
-                }
+                    "properties": parameters.get("entities", {})
+                }]
             }
         elif tool_name == "query_natural_language":
             return {
@@ -200,15 +200,22 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
     
     def create_task(self, task_data: TaskData) -> Optional[str]:
         """Create a task in GraphRAG"""
+        import uuid
+        
         # First, search for related entities
         context = self._get_entity_context(task_data.name)
         
-        # Create the task entity
-        task_properties = {
-            "entity_type": "TASK",
-            "properties": {
-                "name": task_data.name,
-                "description": task_data.description or "",
+        # Generate a unique task ID
+        task_id = f"task_{uuid.uuid4().hex[:8]}"
+        
+        # Create the task entity using create_entities with CORRECT entity type
+        # TASK_MANAGEMENT:TASK requires 'id' and 'description' properties
+        task_params = {
+            "entity_type": "TASK_MANAGEMENT:TASK",  # CORRECT: Uppercase domain
+            "entities": {  # Single entity object (not array)
+                "id": task_id,  # REQUIRED property
+                "description": task_data.description or task_data.name,  # REQUIRED property
+                "name": task_data.name,  # Optional but useful
                 "status": task_data.status,
                 "priority": task_data.priority,
                 "contexts": task_data.contexts,
@@ -217,21 +224,48 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                 "project_name": task_data.project_name or "",
                 "area_name": task_data.area_name or "",
                 "goal_name": task_data.goal_name or ""
-            }
+            },
+            "check_duplicates": True  # Enable deduplication
         }
         
         # Add Notion ID if migrating
         if task_data.metadata.get("notion_id"):
-            task_properties["properties"]["notion_id"] = task_data.metadata["notion_id"]
+            task_params["entities"]["notion_id"] = task_data.metadata["notion_id"]
         
-        # Create the task
-        response = self._execute_mcp_command("create_entity", task_properties)
+        # Create the task using create_entities (plural)
+        response = self._execute_mcp_command("create_entities", task_params)
         
         if not response.get("success"):
             self.logger.error(f"Failed to create task in GraphRAG: {response.get('error')}")
             return None
         
-        task_id = response.get("entity", {}).get("id")
+        # Debug: log the response to understand structure
+        self.logger.debug(f"create_entities response: {response}")
+        
+        # Extract task ID from response
+        # The response structure depends on the MCP tool implementation
+        # It might return results or entities
+        results = response.get("results", [])
+        if results and isinstance(results, list) and len(results) > 0:
+            # Get the entity_id from the first result
+            entity_id = results[0].get("entity_id")
+            if entity_id:
+                self.logger.info(f"Task created with entity_id: {entity_id}, task_id: {task_id}")
+                # Check if embedding was created
+                if results[0].get("embedding_created"):
+                    self.logger.success(f"✅ Embedding created for task: {task_id}")
+                else:
+                    self.logger.warning(f"⚠️ No embedding created for task: {task_id}")
+                return task_id
+        
+        # Fallback: check entities array
+        entities = response.get("entities", [])
+        if entities and isinstance(entities, list):
+            self.logger.warning(f"Using fallback entity extraction from entities array")
+            return entities[0].get("id") if entities[0] else task_id
+        
+        self.logger.error(f"Could not extract task ID from response: {response}")
+        return task_id  # Return the generated ID as fallback
         
         # Create relationships if we have project/area/goal
         if task_id:
@@ -537,26 +571,44 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
         Returns:
             New project's node ID if successful, None if failed
         """
-        # Create the project entity
-        project_properties = {
-            "entity_type": "PROJECT",
-            "properties": {
-                "name": name,
+        # Create the project entity using CORRECT entity type
+        # TASK_MANAGEMENT:PROJECT requires 'name' property
+        project_params = {
+            "entity_type": "TASK_MANAGEMENT:PROJECT",  # CORRECT: Use full entity type
+            "entities": {  # Single entity object, not 'properties'
+                "name": name,  # REQUIRED property
                 "description": description or "",
                 "status": "Active",
-                "created_from_voice": True
-            }
+                "created_from_voice": True,
+                "created": datetime.now().isoformat()
+            },
+            "check_duplicates": True  # Enable deduplication
         }
         
-        # Create PROJECT entity
-        response = self._execute_mcp_command("create_entity", project_properties)
+        # Create PROJECT entity using create_entities (plural)
+        response = self._execute_mcp_command("create_entities", project_params)
         
         if not response.get("success"):
             self.logger.error(f"Failed to create project in GraphRAG: {response.get('error')}")
             return None
         
-        # Get the created project's ID
-        project_node_id = response.get("entity", {}).get("id")
+        # Get the created project's ID from response
+        project_node_id = None
+        
+        # Check results array first
+        results = response.get("results", [])
+        if results and isinstance(results, list) and len(results) > 0:
+            project_node_id = results[0].get("entity_id")
+            if results[0].get("embedding_created"):
+                self.logger.success(f"✅ Embedding created for project: {name}")
+            else:
+                self.logger.warning(f"⚠️ No embedding created for project: {name}")
+        
+        # Fallback: check entities array
+        if not project_node_id:
+            entities = response.get("entities", [])
+            if entities and isinstance(entities, list):
+                project_node_id = entities[0].get("id") if entities[0] else None
         
         # If we have an area_node_id, create the relationship
         if area_node_id and project_node_id:

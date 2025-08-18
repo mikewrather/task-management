@@ -1,19 +1,19 @@
 {
   "status": "healthy",
   "state": "running",
-  "uptime_seconds": 231410,
+  "uptime_seconds": 1191242,
   "stats": {
-    "total_runs": 729,
-    "successful_runs": 728,
+    "total_runs": 3720,
+    "successful_runs": 3719,
     "failed_runs": 0,
-    "files_processed": 1,
-    "last_run": "2025-08-07T06:50:42.051305",
+    "files_processed": 4,
+    "last_run": "2025-08-18T09:27:36.278956",
     "last_error": null
   },
   "claude_status": "valid",
   "config": {
     "interval_seconds": 300,
-    "claude_enabled": true
+    "claude_enabled": false
   },
-  "timestamp": "2025-08-07T06:55:42.051689"
+  "timestamp": "2025-08-18T09:32:54.685953"
 }

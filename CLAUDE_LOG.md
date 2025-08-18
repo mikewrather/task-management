@@ -1132,4 +1132,50 @@ The system is now ready for continued use with confidence in its reliability and
 - **Log Management**: Properly appended session information to CLAUDE_LOG.md (corrected from overwrite)
 - **System Validation**: Voice daemon health confirmed - 231 total runs, 230 successful
 
+## 2025-08-14 - Entity Creation with Embeddings Fix
+
+**Context**: Identified and fixed critical issue where entities in Neo4j were being created without embeddings, preventing semantic search and deduplication.
+
+**Problem Identified**:
+- Entities created without embeddings when using raw Cypher queries
+- Incorrect entity types (e.g., "TASK" instead of "TASK_MANAGEMENT:TASK")
+- Missing required properties causing schema validation failures
+- Using wrong MCP tool (execute_cypher instead of create_entities)
+
+**Changes Implemented**:
+
+1. **GraphRAG Adapter Updates** (`src/voice_task_manager/adapters/graphrag.py`):
+   - Fixed `create_task()`: Now uses `TASK_MANAGEMENT:TASK` with required `id` property
+   - Fixed `create_project()`: Now uses `TASK_MANAGEMENT:PROJECT` with required `name` property
+   - Changed from `create_entity` to `create_entities` MCP tool
+   - Added `check_duplicates: True` for semantic deduplication
+   - Added embedding verification in response handling
+
+2. **Correct Entity Creation Pattern**:
+   ```python
+   # ✅ CORRECT - Creates entities WITH embeddings
+   {
+       "entity_type": "TASK_MANAGEMENT:TASK",  # Full domain:type
+       "entities": {
+           "id": "task_123",           # Required property
+           "description": "...",       # Required property
+           "status": "pending"
+       },
+       "check_duplicates": True       # Enable deduplication
+   }
+   ```
+
+3. **Test Script Created**: `scripts/test_entity_creation_with_embeddings.py`
+   - Verifies entities are created with proper types
+   - Confirms embeddings are generated
+   - Tests duplicate detection functionality
+
+**Key Learnings**:
+- Always use full entity type names with domain prefix (e.g., `TASK_MANAGEMENT:TASK`)
+- Include ALL required properties per schema definition
+- Use `mcp__agent-db__create_entities` tool, never raw Cypher CREATE
+- Enable `check_duplicates` for semantic similarity detection
+
+**Result**: All entities created through voice task manager now have embeddings automatically generated and proper deduplication via semantic similarity
+
 **Status**: All tasks completed. System is clean, tested, and ready for continued development.

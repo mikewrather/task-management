@@ -45,6 +45,7 @@ python scripts/debug/execute_cypher_query.py
 
 ### Special Scripts
 - `test_multi_task_processing.py` - Test multi-task extraction from voice notes (NEW)
+- `test_entity_creation_with_embeddings.py` - Verify entities are created with embeddings using correct MCP tools
 
 ## Cleanup
 
