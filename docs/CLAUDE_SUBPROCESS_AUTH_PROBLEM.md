@@ -211,6 +211,138 @@ Use `--debug` instead of deprecated `--mcp-debug`, and consider `--strict-mcp-co
 | Deprecated flags | Reduced visibility | Use `--debug`; remove `--mcp-debug` |
 | Secrets exposure | Security issue | Never log token values; inject via env, not code |
 
+## Repository-specific updates (actionable)
+
+The following concrete edits will update our current implementation to the stable approach above.
+
+### 1) Add a shared CLI utility
+
+- New file: `src/voice_task_manager/utils/claude_cli.py`
+- Purpose: Resolve the `claude` binary deterministically, build a robust environment for subprocesses, and provide a quick auth preflight.
+
+```python
+from __future__ import annotations
+
+import os
+import shutil
+from pathlib import Path
+from typing import Dict, Tuple
+
+PROJECT_DIR = "/home/mike/development/task-management"
+NVM_CLAUDE_BIN = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+LOCAL_NATIVE_CLAUDE = str(Path.home() / ".claude" / "local" / "claude")
+
+def resolve_claude_path() -> str:
+    path_bin = shutil.which("claude")
+    if path_bin:
+        return path_bin
+    if Path(LOCAL_NATIVE_CLAUDE).exists():
+        return LOCAL_NATIVE_CLAUDE
+    return NVM_CLAUDE_BIN
+
+def build_claude_env(base_env: Dict[str, str] | None = None) -> Dict[str, str]:
+    env = dict(base_env or os.environ)
+    env.setdefault("HOME", str(Path.home()))
+    # If using XDG or custom config dir, set one of the following explicitly:
+    # env.setdefault("XDG_CONFIG_HOME", f"{Path.home()}/.config")
+    # env.setdefault("CLAUDE_CONFIG_DIR", f"{Path.home()}/.claude")
+    nvm_bin = str(Path(NVM_CLAUDE_BIN).parent)
+    if nvm_bin and nvm_bin not in env.get("PATH", "") and Path(nvm_bin).exists():
+        env["PATH"] = f"{nvm_bin}:{env.get('PATH','')}"
+    env["PYTHONPATH"] = f"{PROJECT_DIR}/src:{env.get('PYTHONPATH','')}"
+    return env
+
+def preflight_claude_ok(env: Dict[str, str] | None = None) -> Tuple[bool, str]:
+    import subprocess
+    cmd = [resolve_claude_path(), "-p", "Return only: OK", "--output-format", "json", "--debug"]
+    try:
+        r = subprocess.run(cmd, cwd=PROJECT_DIR, env=env or build_claude_env(), capture_output=True, text=True, timeout=30)
+        return (r.returncode == 0, r.stderr or r.stdout)
+    except Exception as exc:
+        return False, str(exc)
+```
+
+### 2) Update `src/voice_task_manager/adapters/graphrag.py`
+
+- Import and use the utility functions.
+- Replace hardcoded CLI path; use `cwd=project_dir` rather than `os.chdir`.
+- Build env via `build_claude_env()`.
+- Run `preflight_claude_ok()` and fall back to mock on failure.
+- Replace `--mcp-debug` with `--debug` and add `--strict-mcp-config`.
+
+Example inside `_execute_mcp_command` where we construct and run the process:
+
+```python
+from ..utils.claude_cli import resolve_claude_path, build_claude_env, preflight_claude_ok
+
+project_dir = "/home/mike/development/task-management"
+env = build_claude_env()
+ok, err = preflight_claude_ok(env)
+if not ok:
+    self.logger.error(f"Claude preflight failed: {err}")
+    self.logger.warning(f"Falling back to mock for {tool_name}")
+    # ... return mock response early ...
+
+cmd = [
+    resolve_claude_path(),
+    "-p", prompt,
+    "--dangerously-skip-permissions",
+    "--mcp-config", f"{project_dir}/.mcp.json",
+    "--strict-mcp-config",
+    "--debug",
+    "--output-format", "json",
+]
+
+result = subprocess.run(cmd, capture_output=True, text=True, timeout=None, cwd=project_dir, env=env)
+```
+
+### 3) Update `src/voice_task_manager/processors/claude_processor.py`
+
+- Apply the same subprocess treatment in `_execute_claude_with_mcp`:
+  - Use `resolve_claude_path()` and `build_claude_env()`.
+  - Preflight before heavy run; bail out with a clear error JSON.
+  - Add `--strict-mcp-config` and `--debug`; keep `--dangerously-skip-permissions`.
+  - Use `cwd=project_dir` instead of `os.chdir`.
+
+### 4) Update `src/voice_task_manager/services/session_manager.py`
+
+- Add a small helper that surfaces execution readiness for diagnostics:
+
+```python
+from ..utils.claude_cli import preflight_claude_ok, build_claude_env
+
+def get_execution_readiness(self) -> tuple[bool, str]:
+    try:
+        return preflight_claude_ok(build_claude_env())
+    except Exception as exc:
+        return False, str(exc)
+```
+
+- Optionally update `test_claude_execution()` to use `resolve_claude_path()` and `build_claude_env()`.
+
+### 5) Headless token support (optional but recommended for CI)
+
+- Generate a long-lived token on a dev machine:
+
+```bash
+claude setup-token
+```
+
+- Inject into CI/service environment:
+
+```bash
+export CLAUDE_CODE_OAUTH_TOKEN="Claude-..."
+```
+
+- Do not hardcode tokens in code or logs. Prefer env files or systemd `Environment=` entries.
+
+### 6) Test plan
+
+1. Run the new preflight via a small script or call path; confirm success and no 404.
+2. Execute `scripts/debug/test_mcp_connection.py`; ensure MCP health passes.
+3. Run a voice processing path end-to-end and verify embeddings/relationships are created.
+4. Validate that logs no longer show `opusplan`/404 errors and that a single CLI path is used.
+
 ## Conclusion
 
 Stabilizing Claude CLI subprocess authentication is primarily an environment and configuration task: unify the CLI binary, ensure the subprocess has a valid `HOME`/config path, adopt supported tokens for headless runs (`claude setup-token` → `CLAUDE_CODE_OAUTH_TOKEN`), switch to current flags, and add a quick preflight. This preserves Max plan benefits, avoids API costs, and restores reliable MCP-powered task intelligence.

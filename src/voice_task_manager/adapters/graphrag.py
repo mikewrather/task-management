@@ -6,6 +6,7 @@ import os
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from ..utils.logging import VoiceLogger
+from ..utils.claude_cli import get_claude_path, build_claude_env, preflight_claude_ok
 from .base import TaskAdapter, TaskData
 
 
@@ -61,117 +62,109 @@ class GraphRAGTaskAdapter(TaskAdapter):
 
 Return ONLY the raw JSON result from the tool, with no additional text or formatting."""
                 
-                # Execute via claude -p in the project directory
-                # Use full path to claude command
-                import os
-                original_cwd = os.getcwd()
                 project_dir = "/home/mike/development/task-management"
                 
-                claude_path = "/home/mike/.claude/local/claude"
-                cmd = [
-                    claude_path, 
-                    "-p", prompt,
-                    "--dangerously-skip-permissions",
-                    "--mcp-config", ".mcp.json",
-                    "--mcp-debug",  # Add debug flag for better MCP troubleshooting
-                    "--output-format", "json"
-                ]
+                # Build robust environment for subprocess
+                env = build_claude_env()
                 
-                self.logger.debug(f"Executing real MCP command: {tool_name}")
-                self.logger.debug(f"Command: {' '.join(cmd)}")
-                
-                try:
-                    os.chdir(project_dir)
+                # Run preflight check before executing MCP command
+                ok, error_msg = preflight_claude_ok(env)
+                if not ok:
+                    self.logger.error(f"Claude preflight failed: {error_msg}")
+                    self.logger.warning(f"Falling back to mock for {tool_name}")
+                    # Fall through to mock implementation below
+                else:
+                    cmd = [
+                        get_claude_path(), 
+                        "-p", prompt,
+                        "--dangerously-skip-permissions",
+                        "--mcp-config", ".mcp.json",
+                        "--strict-mcp-config",  # Only use specified MCP servers
+                        "--debug",  # Use --debug instead of deprecated --mcp-debug
+                        "--output-format", "json"
+                    ]
                     
-                    # Set up environment to use existing Claude Max plan authentication
-                    # The subprocess should inherit the auth from the parent Claude session
-                    # NOT use API keys which would consume credits
-                    env = {**os.environ}
-                    env["PYTHONPATH"] = f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"
-                    
-                    # Important: We want to use the Claude Max plan authentication
-                    # from the existing session, not API keys which cost money
-                    # The authentication should come from the running Claude process
+                    self.logger.debug(f"Executing real MCP command: {tool_name}")
+                    self.logger.debug(f"Command: {' '.join(cmd)}")
                     
                     result = subprocess.run(
                         cmd,
+                        cwd=project_dir,  # Use cwd parameter instead of os.chdir
                         capture_output=True,
                         text=True,
                         timeout=None,  # No timeout - let Claude finish
                         env=env
                     )
-                finally:
-                    os.chdir(original_cwd)
-                
-                if result.returncode != 0:
-                    self.logger.error(f"Claude execution failed with return code {result.returncode}")
-                    self.logger.error(f"STDERR: {result.stderr}")
-                    self.logger.error(f"STDOUT: {result.stdout}")
-                    # Fall back to mock
-                    self.logger.warning(f"Falling back to mock for {tool_name}")
-                else:
-                    # Try to extract JSON from response
-                    output = result.stdout.strip()
                     
-                    # First check if this is a claude JSON output format
-                    try:
-                        claude_response = json.loads(output)
-                        if isinstance(claude_response, dict) and 'result' in claude_response:
-                            # Extract the result field which contains the actual response
-                            result_content = claude_response['result']
+                    if result.returncode != 0:
+                        self.logger.error(f"Claude execution failed with return code {result.returncode}")
+                        self.logger.error(f"STDERR: {result.stderr}")
+                        self.logger.error(f"STDOUT: {result.stdout}")
+                        # Fall back to mock
+                        self.logger.warning(f"Falling back to mock for {tool_name}")
+                    else:
+                        # Try to extract JSON from response
+                        output = result.stdout.strip()
+                        
+                        # First check if this is a claude JSON output format
+                        try:
+                            claude_response = json.loads(output)
+                            if isinstance(claude_response, dict) and 'result' in claude_response:
+                                # Extract the result field which contains the actual response
+                                result_content = claude_response['result']
                             
-                            # Check if it's already JSON
-                            if result_content.startswith('```json') and result_content.endswith('```'):
-                                result_content = result_content[7:-3].strip()
-                                response = json.loads(result_content)
-                            elif result_content.startswith('{') and result_content.endswith('}'):
-                                response = json.loads(result_content)
-                            else:
-                                # Handle text responses for execute_cypher
-                                if tool_name == "execute_cypher":
-                                    # Only use text parser for simple count queries
-                                    query = parameters.get("query", "").lower()
-                                    if "count(" in query and "return" in query and len(query.split("return")[1].split(",")) == 1:
-                                        response = self._parse_cypher_text_response(result_content, parameters)
-                                    else:
-                                        # For complex queries, check if the text indicates success
-                                        if any(success_phrase in result_content.lower() for success_phrase in [
-                                            "successfully", "executed successfully", "created", "updated", "deleted"
-                                        ]):
-                                            response = {"success": True, "result": result_content}
-                                        else:
-                                            response = {"success": False, "error": f"Complex query returned text: {result_content[:200]}..."}
+                                # Check if it's already JSON
+                                if result_content.startswith('```json') and result_content.endswith('```'):
+                                    result_content = result_content[7:-3].strip()
+                                    response = json.loads(result_content)
+                                elif result_content.startswith('{') and result_content.endswith('}'):
+                                    response = json.loads(result_content)
                                 else:
-                                    # For other tools, try to extract JSON or return text
-                                    response = {"success": True, "result": result_content}
-                            
-                            self.logger.success(f"Real MCP execution successful for {tool_name}")
-                            return response
-                    except (json.JSONDecodeError, KeyError):
-                        pass
-                    
-                    # Fallback: Look for JSON in the output
-                    import re
-                    # Try to find a complete JSON object - look for the tool response
-                    # The response might be wrapped in the MCP tool response format
-                    json_patterns = [
-                        r'\{[^{}]*"success"[^{}]*:.*?\}(?=\s*$|\s*\n)',  # Look for success response
-                        r'\{[^{}]*"entity"[^{}]*:.*?\}',  # Look for entity response
-                        r'\{[^{}]*"components"[^{}]*:.*?\}',  # Look for health check response
-                        r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'  # Generic JSON object
-                    ]
-                    
-                    for pattern in json_patterns:
-                        json_match = re.search(pattern, output, re.DOTALL)
-                        if json_match:
-                            try:
-                                response = json.loads(json_match.group())
+                                    # Handle text responses for execute_cypher
+                                    if tool_name == "execute_cypher":
+                                        # Only use text parser for simple count queries
+                                        query = parameters.get("query", "").lower()
+                                        if "count(" in query and "return" in query and len(query.split("return")[1].split(",")) == 1:
+                                            response = self._parse_cypher_text_response(result_content, parameters)
+                                        else:
+                                            # For complex queries, check if the text indicates success
+                                            if any(success_phrase in result_content.lower() for success_phrase in [
+                                                "successfully", "executed successfully", "created", "updated", "deleted"
+                                            ]):
+                                                response = {"success": True, "result": result_content}
+                                            else:
+                                                response = {"success": False, "error": f"Complex query returned text: {result_content[:200]}..."}
+                                    else:
+                                        # For other tools, try to extract JSON or return text
+                                        response = {"success": True, "result": result_content}
+                                
                                 self.logger.success(f"Real MCP execution successful for {tool_name}")
                                 return response
-                            except json.JSONDecodeError:
-                                continue
+                        except (json.JSONDecodeError, KeyError):
+                            pass
                     
-                    self.logger.error(f"No valid JSON found in Claude response: {output[:200]}...")
+                        # Fallback: Look for JSON in the output
+                        import re
+                        # Try to find a complete JSON object - look for the tool response
+                        # The response might be wrapped in the MCP tool response format
+                        json_patterns = [
+                            r'\{[^{}]*"success"[^{}]*:.*?\}(?=\s*$|\s*\n)',  # Look for success response
+                            r'\{[^{}]*"entity"[^{}]*:.*?\}',  # Look for entity response
+                            r'\{[^{}]*"components"[^{}]*:.*?\}',  # Look for health check response
+                            r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}'  # Generic JSON object
+                        ]
+                        
+                        for pattern in json_patterns:
+                            json_match = re.search(pattern, output, re.DOTALL)
+                            if json_match:
+                                try:
+                                    response = json.loads(json_match.group())
+                                    self.logger.success(f"Real MCP execution successful for {tool_name}")
+                                    return response
+                                except json.JSONDecodeError:
+                                    continue
+                        
+                        self.logger.error(f"No valid JSON found in Claude response: {output[:200]}...")
                         
             except subprocess.TimeoutExpired:
                 self.logger.error(f"MCP execution timed out for {tool_name}")

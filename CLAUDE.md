@@ -110,35 +110,82 @@ mcp dev notion_mcp_server.py
 
 ## Critical Implementation Details
 
-### Claude Max Plan Authentication (IMPORTANT)
+### Claude Authentication
 
-**This system uses Claude Code as a sub-agent to leverage the Claude Max plan, NOT API credits.**
+**This system uses Claude Code CLI (native binary) to leverage the Claude Max plan via OAuth, NOT API credits.**
 
-Key points:
-- **Never default to API keys** - They consume credits and cost money
-- The system should use the existing Claude OAuth session from the Max plan
-- If API access is absolutely needed, use cheaper models (Haiku/Sonnet) not Opus
+#### Binary Selection
+- **ALWAYS use**: `/home/mike/.claude/local/claude` (native binary v1.0.83+)
+- **NEVER use**: NVM binary at `/home/mike/.nvm/versions/node/v24.2.0/bin/claude` (outdated)
 
-**Current Issue**: Subprocess calls to Claude CLI fail with "opusplan" authentication errors because they don't inherit the OAuth session. The fallback to mock implementation returns empty data.
+#### Authentication Methods
 
-**Solution needed**: Extract and pass the OAuth token from the running Claude session to subprocess calls, maintaining Max plan usage without consuming API credits.
+**1. Interactive Development (Default)**
+- Relies on OAuth credentials at `~/.claude/.credentials.json`
+- Authenticate with: `claude login`
+- Credentials persist for 30-90 days
+- Subprocess must have `HOME` environment variable set to find credentials
 
-### MCP Execution from Python
+**2. Headless/CI Environments**
+- Generate long-lived token: `claude setup-token`
+- Export token: `export CLAUDE_CODE_OAUTH_TOKEN="Claude-..."`
+- Token works without interactive login
 
-When calling Claude with MCP tools from subprocess:
+#### MCP Execution from Python
+
+Use the shared utility for robust subprocess execution:
 
 ```python
-# CORRECT: Change to project directory first
-os.chdir("/home/mike/development/task-management")
+from voice_task_manager.utils.claude_cli import execute_claude_command
+
+# Automatic preflight check, environment setup, and error handling
+success, stdout, stderr = execute_claude_command(
+    prompt="Your prompt here",
+    mcp_config=".mcp.json",
+    timeout=None  # No timeout for long MCP operations
+)
+```
+
+Or use the lower-level utilities:
+
+```python
+from voice_task_manager.utils.claude_cli import get_claude_path, build_claude_env, preflight_claude_ok
+
+# Build robust environment
+env = build_claude_env()
+
+# Run preflight check
+ok, error_msg = preflight_claude_ok(env)
+if not ok:
+    print(f"Auth failed: {error_msg}")
+    # Fall back to mock or handle error
+
+# Execute command
 cmd = [
-    "/home/mike/.nvm/versions/node/v24.2.0/bin/claude",
-    "-p", prompt,  # -p takes the PROMPT text, NOT project name!
+    get_claude_path(),  # Always returns native binary
+    "-p", prompt,
     "--dangerously-skip-permissions",
+    "--mcp-config", ".mcp.json",
+    "--strict-mcp-config",
+    "--debug",  # Use --debug not --mcp-debug
     "--output-format", "json"
 ]
-# Set timeout=None for long-running MCP operations (30-60s typical)
-result = subprocess.run(cmd, timeout=None, capture_output=True, text=True)
+result = subprocess.run(cmd, cwd=PROJECT_DIR, env=env, capture_output=True, text=True, timeout=None)
 ```
+
+#### Troubleshooting Authentication
+
+**If subprocess authentication fails:**
+1. Check Claude binary: `/home/mike/.claude/local/claude --version`
+2. Verify credentials exist: `ls -la ~/.claude/.credentials.json`
+3. Test authentication: `python scripts/debug/test_claude_auth.py`
+4. Check MCP access: `USE_REAL_MCP=true python scripts/debug/test_mcp_connection.py`
+
+**Common Issues:**
+- Missing HOME environment → Can't find credentials
+- Using wrong binary → Outdated CLI version
+- Expired OAuth token → Run `claude login` again
+- Deprecated flags → Use `--debug` not `--mcp-debug`
 
 ### GraphRAG Configuration
 

@@ -8,8 +8,8 @@ import os
 # Change to project directory
 os.chdir("/home/mike/development/task-management")
 
-# Claude path
-claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+# Claude path - use native binary, not NVM
+claude_path = "/home/mike/.claude/local/claude"
 
 # Step 1: Find projects without area relationships
 print("🔍 Finding projects without area relationships...\n")

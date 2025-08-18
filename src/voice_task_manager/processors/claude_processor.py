@@ -8,6 +8,7 @@ from datetime import datetime
 from ..adapters.base import TaskData
 from ..adapters.graphrag import GraphRAGTaskAdapter
 from ..utils.logging import VoiceLogger
+from ..utils.claude_cli import get_claude_path, build_claude_env, preflight_claude_ok
 
 
 class ClaudeVoiceProcessor:
@@ -305,16 +306,18 @@ REMEMBER: Your goal is to create a well-connected knowledge graph. Every task sh
     
     def _execute_claude_with_mcp(self, prompt: str) -> Dict[str, Any]:
         """Execute Claude with MCP access for intelligent processing"""
-        # Define project_dir at the start to avoid scope issues
-        import os
-        original_cwd = os.getcwd()
         project_dir = "/home/mike/development/task-management"
         
+        # Build robust environment for subprocess
+        env = build_claude_env()
+        
+        # Run preflight check before executing
+        ok, error_msg = preflight_claude_ok(env)
+        if not ok:
+            self.logger.error(f"Claude preflight failed: {error_msg}")
+            return {"success": False, "error": f"Authentication failed: {error_msg}"}
+        
         try:
-            # Use Claude with project context and MCP access
-            # Use full path to claude command
-            claude_path = "/home/mike/.claude/local/claude"
-            
             # Add instruction to use MCP tools
             full_prompt = f"""{prompt}
 
@@ -327,27 +330,26 @@ Remember to:
 3. Return ONLY the JSON response, no explanations"""
             
             cmd = [
-                claude_path, 
+                get_claude_path(), 
                 "-p", full_prompt,
                 "--dangerously-skip-permissions",
-                "--mcp-config", f"{project_dir}/.mcp.json",
+                "--mcp-config", ".mcp.json",
+                "--strict-mcp-config",  # Only use specified MCP servers
+                "--debug",  # Use --debug instead of deprecated flags
                 "--output-format", "json"
             ]
             
             self.logger.info(f"Executing Claude with MCP access")
             self.logger.debug(f"Prompt length: {len(full_prompt)} characters")
             
-            try:
-                os.chdir(project_dir)
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=None,  # No timeout - let Claude finish
-                    env={**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
-                )
-            finally:
-                os.chdir(original_cwd)
+            result = subprocess.run(
+                cmd,
+                cwd=project_dir,  # Use cwd parameter instead of os.chdir
+                capture_output=True,
+                text=True,
+                timeout=None,  # No timeout - let Claude finish
+                env=env
+            )
             
             if result.returncode != 0:
                 error_msg = f"Claude execution failed: {result.stderr}"
