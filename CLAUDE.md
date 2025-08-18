@@ -110,6 +110,19 @@ mcp dev notion_mcp_server.py
 
 ## Critical Implementation Details
 
+### Claude Max Plan Authentication (IMPORTANT)
+
+**This system uses Claude Code as a sub-agent to leverage the Claude Max plan, NOT API credits.**
+
+Key points:
+- **Never default to API keys** - They consume credits and cost money
+- The system should use the existing Claude OAuth session from the Max plan
+- If API access is absolutely needed, use cheaper models (Haiku/Sonnet) not Opus
+
+**Current Issue**: Subprocess calls to Claude CLI fail with "opusplan" authentication errors because they don't inherit the OAuth session. The fallback to mock implementation returns empty data.
+
+**Solution needed**: Extract and pass the OAuth token from the running Claude session to subprocess calls, maintaining Max plan usage without consuming API credits.
+
 ### MCP Execution from Python
 
 When calling Claude with MCP tools from subprocess:

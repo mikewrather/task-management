@@ -82,12 +82,23 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                 
                 try:
                     os.chdir(project_dir)
+                    
+                    # Set up environment to use existing Claude Max plan authentication
+                    # The subprocess should inherit the auth from the parent Claude session
+                    # NOT use API keys which would consume credits
+                    env = {**os.environ}
+                    env["PYTHONPATH"] = f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"
+                    
+                    # Important: We want to use the Claude Max plan authentication
+                    # from the existing session, not API keys which cost money
+                    # The authentication should come from the running Claude process
+                    
                     result = subprocess.run(
                         cmd,
                         capture_output=True,
                         text=True,
                         timeout=None,  # No timeout - let Claude finish
-                        env={**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
+                        env=env
                     )
                 finally:
                     os.chdir(original_cwd)
