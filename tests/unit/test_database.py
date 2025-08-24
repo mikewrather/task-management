@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 
 from voice_task_manager.utils.database import VoiceDatabase
 from voice_task_manager.models.voice_file import VoiceFile
-from voice_task_manager.models.task import NotionTask
+from voice_task_manager.models.task import Task
 
 
 class TestVoiceDatabase:
@@ -180,7 +180,7 @@ class TestVoiceDatabase:
     def test_save_and_get_task(self, db):
         """Test saving and retrieving tasks"""
         # Create a test task
-        task = NotionTask(
+        task = Task(
             task_id="test_task_123",
             title="Test Task",
             content="This is test content",
@@ -208,7 +208,7 @@ class TestVoiceDatabase:
         """Test retrieving tasks by voice file ID"""
         # Create tasks linked to the same voice file
         for i in range(2):
-            task = NotionTask(
+            task = Task(
                 task_id=f"task_{i}",
                 title=f"Task {i}",
                 content=f"Content {i}",
@@ -217,7 +217,7 @@ class TestVoiceDatabase:
             db.save_task(task)
         
         # Create a task linked to different file
-        unrelated_task = NotionTask(
+        unrelated_task = Task(
             task_id="unrelated",
             title="Unrelated Task",
             content="Unrelated content",
@@ -284,8 +284,8 @@ class TestVoiceDatabase:
         assert retrieved.file_size == 1024
         assert retrieved.metadata == {"test": "data"}
         
-        # Test with NotionTask
-        task = NotionTask(
+        # Test with Task
+        task = Task(
             task_id="conversion_task",
             title="Conversion Test",
             content="Conversion test content",

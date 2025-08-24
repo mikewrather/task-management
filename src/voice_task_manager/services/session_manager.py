@@ -14,6 +14,7 @@ from enum import Enum
 
 from ..utils.logging import VoiceLogger
 from ..utils.notifications import VoiceNotificationSystem
+from ..utils.claude_cli import get_claude_path, build_claude_env, preflight_claude_ok
 
 
 class SimpleNotifier:
@@ -152,12 +153,13 @@ class ClaudeSessionManager:
             Tuple of (success, error_message)
         """
         try:
-            # Simple test command
-            claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+            # Use the shared utility for consistent behavior
+            env = build_claude_env()
             cmd = [
-                claude_path,
+                get_claude_path(),
                 "-p", "Return only: OK",
                 "--dangerously-skip-permissions",
+                # Removed --debug flag as it can corrupt JSON output
                 "--output-format", "json"
             ]
             
@@ -166,7 +168,8 @@ class ClaudeSessionManager:
                 capture_output=True,
                 text=True,
                 timeout=30,
-                env={**os.environ, "HOME": str(Path.home())}
+                env=env,
+                cwd="/home/mike/development/task-management"
             )
             
             if result.returncode == 0:
@@ -180,6 +183,23 @@ class ClaudeSessionManager:
             return False, "Claude execution timed out"
         except Exception as e:
             return False, str(e)
+    
+    def get_execution_readiness(self) -> Tuple[bool, str]:
+        """
+        Check if Claude is ready for execution with MCP
+        
+        Returns:
+            Tuple of (ready: bool, status_message: str)
+        """
+        try:
+            # Use the preflight check from shared utility
+            ok, message = preflight_claude_ok()
+            if ok:
+                return True, f"✅ Claude ready: {message}"
+            else:
+                return False, f"❌ Claude not ready: {message}"
+        except Exception as exc:
+            return False, f"❌ Error checking readiness: {str(exc)}"
             
     def check_and_notify(self, force: bool = False) -> SessionInfo:
         """

@@ -39,7 +39,7 @@ except ImportError:
 from ..utils.logging import VoiceLogger
 from ..utils.database import VoiceDatabase
 from ..models.voice_file import VoiceFile
-from ..models.task import NotionTask
+from ..models.task import Task
 
 class NotificationPriority(Enum):
     """Notification priority levels"""
@@ -152,7 +152,7 @@ class VoiceNotificationSystem:
                 'desktop_title': '🎤 Voice Note Processed',
                 'desktop_message': 'Created task: {short_transcript}',
                 'email_subject': 'Voice Note Processed Successfully',
-                'email_body': '''Your voice note has been processed and added to Notion:
+                'email_body': '''Your voice note has been processed and added to GraphRAG:
 
 Transcript: {transcript}
 
@@ -193,7 +193,7 @@ Total: {total_count} files processed
 Recent Activity:
 {recent_activity}
 
-📋 View all tasks: https://www.notion.so/183267fb-e1c1-4b3b-a42a-5ac1ab8353eb
+📋 View system status: vtm status
 
 ---
 Voice Task Management System''',
@@ -218,13 +218,13 @@ Voice Task Management System''',
             }
         }
     
-    def notify_processing_success(self, voice_file: VoiceFile, task: Optional[NotionTask] = None) -> Dict[str, bool]:
+    def notify_processing_success(self, voice_file: VoiceFile, task: Optional[Task] = None) -> Dict[str, bool]:
         """
         Send notifications when a file is successfully processed
         
         Args:
             voice_file: The processed voice file
-            task: The created Notion task (optional)
+            task: The created task (optional)
             
         Returns:
             Dictionary with success status for each notification channel
@@ -541,7 +541,7 @@ Voice Task Management System''',
             'file_id': 'test_file_123',
             'transcript': 'This is a test notification from the Voice Task Manager system.',
             'short_transcript': 'This is a test notification...',
-            'task_url': 'https://notion.so/test-task',
+            'task_url': 'graphrag://test-task',
             'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'error_message': 'Test error message',
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -585,7 +585,7 @@ def get_notification_system(project_root: Optional[Path] = None) -> VoiceNotific
     """Get a VoiceNotificationSystem instance"""
     return VoiceNotificationSystem(project_root)
 
-def notify_success(voice_file: VoiceFile, task: Optional[NotionTask] = None) -> Dict[str, bool]:
+def notify_success(voice_file: VoiceFile, task: Optional[Task] = None) -> Dict[str, bool]:
     """Quick success notification"""
     system = get_notification_system()
     return system.notify_processing_success(voice_file, task)

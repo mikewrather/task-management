@@ -1,0 +1,29 @@
+# <!-- Powered by BMAD™ Core -->
+markdownExploder: true
+
+# Feature Folder Configuration
+featureMode: true # Enable feature-based folder organization
+featureBranchPattern: "feature/|features/" # Git branch patterns for feature detection
+featureDetection: auto # auto|manual|disabled
+
+qa:
+  qaLocation: docs/{{feature}}/qa
+prd:
+  prdFile: docs/{{feature}}/prd.md
+  prdVersion: v4
+  prdSharded: true
+  prdShardedLocation: docs/{{feature}}/prd
+  epicFilePattern: epic-{n}*.md
+architecture:
+  architectureFile: docs/{{feature}}/architecture.md
+  architectureVersion: v4
+  architectureSharded: true
+  architectureShardedLocation: docs/{{feature}}/architecture
+customTechnicalDocuments: null
+devLoadAlwaysFiles:
+  - docs/{{feature}}/architecture/coding-standards.md
+  - docs/{{feature}}/architecture/tech-stack.md
+  - docs/{{feature}}/architecture/source-tree.md
+devDebugLog: .ai/debug-log.md
+devStoryLocation: docs/{{feature}}/stories
+slashPrefix: BMad

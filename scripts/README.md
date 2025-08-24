@@ -1,152 +1,152 @@
 # Scripts Directory
 
-This directory contains utility scripts organized by function for the Voice Task Management system.
+Essential utility scripts for the Voice Task Management system, streamlined after removing Notion dependencies.
 
 ## 📁 Directory Structure
 
 ```
 scripts/
-├── debug/                  # Debugging and verification utilities
-├── analysis/              # Log and performance analysis tools
-├── maintenance/           # System maintenance and cleanup scripts
-└── legacy/                # Legacy scripts (to be migrated/removed)
+├── analysis/               # System analysis and monitoring
+├── debug/                  # Essential debugging utilities  
+├── maintenance/           # Database and system maintenance
+├── services/              # Core system services
+└── setup/                 # System configuration
 ```
 
 ## 🔍 Debug Scripts
 
-Scripts for debugging and verifying system functionality:
+Essential debugging utilities:
 
-### Database & Processing
-- **`check_database.py`** - Verify SQLite database integrity and contents
-- **`check_db_content.py`** - Detailed database content inspection
-- **`check_file_tracking.py`** - Verify voice file processing status
-- **`check_graphrag_db.py`** - Check Neo4j/GraphRAG database connectivity
-- **`check_pending_files.py`** - List unprocessed voice files
-- **`check_task_relationships.py`** - Verify task-project-area relationships
-
-### Integration Testing
-- **`test_claude_mcp.py`** - Test Claude MCP integration
-- **`test_claude_subprocess.py`** - Test Claude subprocess execution
-- **`test_graphrag_connection.py`** - Test GraphRAG/Neo4j connectivity
-- **`test_notion_import.py`** - Verify Notion API imports
-- **`test_task_adapter.py`** - Test task adapter implementations
-
-### System Verification
-- **`verify_env.py`** - Verify environment variables and configuration
-- **`verify_imports.py`** - Check all package imports
-- **`debug_claude_processing.py`** - Debug Claude AI processing pipeline
+- **`verify_neo4j_connection.py`** - Test Neo4j/GraphRAG database connectivity
 
 ## 📊 Analysis Scripts
 
-Tools for analyzing system performance and logs:
+Performance monitoring and log analysis:
 
-### Log Analysis
-- **`analyze_logs.py`** - Comprehensive log analysis tool
-- **`analyze_processing_errors.py`** - Error pattern analysis
-- **`analyze_voice_runs.py`** - Voice processing run statistics
-
-### Performance Analysis
-- **`performance_test_graphrag.py`** - GraphRAG performance benchmarks
-- **`analyze_adapter_performance.py`** - Adapter performance comparison
+- **`analyze-voice-runs.py`** - Voice processing statistics and performance analysis
+- **`quick-summary.sh`** - Quick performance summary from logs
 
 ## 🛠️ Maintenance Scripts
 
-System maintenance and cleanup utilities:
+Database and system maintenance utilities:
 
-### Project Maintenance
+### Database Operations
 - **`check_project_structure.py`** - Verify project follows Python best practices
-- **`fix_test_imports.py`** - Fix test import paths after reorganization
-- **`clean_pycache.py`** - Remove Python cache files
+- **`check_voice_tasks_in_graphrag.py`** - Verify voice tasks in GraphRAG database
+- **`cleanup-processed-files.py`** - Clean up processed voice files
+- **`cleanup_relationships.py`** - Clean up GraphRAG relationships and duplicates
+- **`establish_project_area_relationships.py`** - Create project-area relationships in GraphRAG
+- **`reprocess_voice_tasks_to_graphrag.py`** - Reprocess existing tasks to GraphRAG
 
-### Cleanup Utilities
-- **`cleanup_debug_files.py`** - Remove temporary debug outputs
-- **`delete_duplicate_notion_tasks.py`** - Remove duplicate Notion entries
-- **`simple_delete_duplicates.py`** - Basic duplicate removal
+### System Utilities
+- **`fix_test_imports.py`** - Fix test import paths after refactoring
+- **`notification-system.py`** - System notification management
+- **`voice_logging.py`** - Voice processing logging utilities
+
+## 🚀 Services Scripts
+
+Core system service:
+
+- **`voice-processing-service.py`** - Main voice processing daemon service
+
+## 🔧 Setup Scripts
+
+System configuration and setup:
+
+- **`secure-credentials.sh`** - Secure credential management setup
+- **`setup-claude-agent.sh`** - Claude agent configuration
+
+## 📋 System Management Scripts
+
+Voice processing system management:
+
+- **`quick-dev-setup.sh`** - Quick development environment setup
+- **`setup-voice-cron.sh`** - Setup voice processing cron job  
+- **`voice-monitor-cron.sh`** - Voice processing monitoring via cron
+- **`voice-status.sh`** - System status dashboard
+- **`vtm-cron-wrapper.sh`** - Voice Task Manager cron wrapper
 
 ## 🔧 Usage Examples
 
 ### Debug Database Issues
 ```bash
-# Check database content
-python scripts/debug/check_database.py
-
-# Verify pending files
-python scripts/debug/check_pending_files.py
-
 # Check GraphRAG connectivity
-python scripts/debug/check_graphrag_db.py
+python scripts/debug/verify_neo4j_connection.py
 ```
 
-### Analyze System Performance
+### Monitor System Performance  
 ```bash
 # Analyze recent processing runs
-python scripts/analysis/analyze_voice_runs.py --recent 10
+python scripts/analysis/analyze-voice-runs.py
 
-# Check for error patterns
-python scripts/analysis/analyze_processing_errors.py
+# Quick performance summary
+bash scripts/analysis/quick-summary.sh
 
-# Benchmark GraphRAG performance
-python scripts/analysis/performance_test_graphrag.py
+# Check system status
+bash scripts/voice-status.sh
 ```
 
-### Maintain System Health
+### Maintain Database Health
 ```bash
 # Verify project structure
 python scripts/maintenance/check_project_structure.py
 
-# Clean Python cache
-python scripts/maintenance/clean_pycache.py
+# Check voice tasks in GraphRAG
+python scripts/maintenance/check_voice_tasks_in_graphrag.py
 
-# Remove duplicate tasks
-python scripts/maintenance/delete_duplicate_notion_tasks.py --dry-run
+# Clean up relationships
+python scripts/maintenance/cleanup_relationships.py
+
+# Establish missing relationships
+python scripts/maintenance/establish_project_area_relationships.py
+```
+
+### Setup Development Environment
+```bash
+# Quick development setup
+bash scripts/quick-dev-setup.sh
+
+# Setup credentials securely  
+bash scripts/setup/secure-credentials.sh
 ```
 
 ## 🚀 Quick Reference
 
-### Common Debugging Tasks
+### Common Issues
 
-**Voice file not processing?**
+**Voice files not processing?**
 ```bash
-python scripts/debug/check_pending_files.py
-python scripts/debug/check_file_tracking.py <file_id>
+bash scripts/voice-status.sh
+python scripts/analysis/analyze-voice-runs.py
 ```
 
-**Task relationships missing?**
+**GraphRAG relationships missing?**
 ```bash
-python scripts/debug/check_task_relationships.py
-python scripts/debug/check_graphrag_db.py
+python scripts/maintenance/establish_project_area_relationships.py
+python scripts/debug/verify_neo4j_connection.py
 ```
 
-**Import errors?**
+**System performance issues?**
 ```bash
-python scripts/debug/verify_imports.py
+python scripts/analysis/analyze-voice-runs.py
+bash scripts/analysis/quick-summary.sh
+```
+
+**Import/structure errors?**
+```bash
 python scripts/maintenance/fix_test_imports.py
-```
-
-### Performance Issues
-
-**Slow processing?**
-```bash
-python scripts/analysis/analyze_adapter_performance.py
-python scripts/analysis/performance_test_graphrag.py
-```
-
-**High error rate?**
-```bash
-python scripts/analysis/analyze_processing_errors.py
-python scripts/analysis/analyze_voice_runs.py --errors
+python scripts/maintenance/check_project_structure.py
 ```
 
 ## 📝 Script Guidelines
 
-When creating new scripts:
+Essential practices for new scripts:
 
-1. **Organization** - Place in appropriate subdirectory
-2. **Naming** - Use descriptive names with underscore separation
-3. **Documentation** - Include docstring with purpose and usage
-4. **Imports** - Use absolute imports from `voice_task_manager`
-5. **Error Handling** - Include proper exception handling
-6. **Logging** - Use the project's logging configuration
+1. **Organization** - Place in appropriate subdirectory based on function
+2. **GraphRAG Focus** - Use only GraphRAG/Neo4j, no Notion dependencies  
+3. **Documentation** - Include clear docstring with purpose and usage
+4. **Error Handling** - Include proper exception handling and logging
+5. **Package Imports** - Use absolute imports from `voice_task_manager`
 
 Example template:
 ```python
@@ -172,7 +172,7 @@ def main():
     """Main script logic."""
     try:
         # Script implementation
-        pass
+        logger.info("Script completed successfully")
     except Exception as e:
         logger.error(f"Script failed: {e}")
         sys.exit(1)
@@ -181,19 +181,22 @@ if __name__ == "__main__":
     main()
 ```
 
-## 🔄 Migration Status
+## 🧹 Recent Cleanup (2025-08-07)
 
-### Completed Migrations
-- ✅ Moved all debug scripts to `debug/`
-- ✅ Moved analysis scripts to `analysis/`
-- ✅ Moved maintenance scripts to `maintenance/`
-- ✅ Updated imports to use package structure
+### Removed Obsolete Scripts ✅
+- ✅ 4 Notion-based duplicate cleanup scripts 
+- ✅ 2 Notion MCP inspector scripts
+- ✅ 1 Notion-based test pipeline script
+- ✅ 1 Notion-based automated processor
+- ✅ 1 Completed UV migration script  
+- ✅ 1 MCP server test script
 
-### Pending Migrations
-- ⏳ Legacy shell scripts in `legacy/`
-- ⏳ Consolidate duplicate functionality
-- ⏳ Convert shell scripts to Python where appropriate
+### Current Status ✅
+- ✅ **20 essential scripts** (down from 29)
+- ✅ **Pure GraphRAG focus** - no Notion dependencies
+- ✅ **Clear organization** by function and purpose
+- ✅ **All scripts tested** and functional with current architecture
 
 ---
 
-*Updated: 2025-07-31 - Reflects current organized script structure*
+*Updated: 2025-08-07 - Essential scripts only, pure GraphRAG architecture*

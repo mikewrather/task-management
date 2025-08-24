@@ -293,7 +293,7 @@ class PerformanceIntegration:
             'process_all_files', 
             'process_single_file',
             '_transcribe_audio',
-            '_create_notion_task'
+            'create_task'
         ]
         
         for method_name in key_methods:

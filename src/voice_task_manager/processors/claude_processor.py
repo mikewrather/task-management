@@ -3,11 +3,12 @@
 import subprocess
 import json
 import os
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
 from ..adapters.base import TaskData
 from ..adapters.graphrag import GraphRAGTaskAdapter
 from ..utils.logging import VoiceLogger
+from ..utils.claude_cli import get_claude_path, build_claude_env, preflight_claude_ok
 
 
 class ClaudeVoiceProcessor:
@@ -72,17 +73,29 @@ class ClaudeVoiceProcessor:
             # Create TaskData objects for each task
             created_tasks = []
             for i, task_info in enumerate(tasks_data):
+                # Handle project creation if needed
+                project_id = task_info.get("project_id")
+                project_name = task_info.get("project_name")
+                
+                if task_info.get("create_project", False) and task_info.get("suggested_project"):
+                    # Attempt to create the suggested project
+                    project_id, project_name = self._create_project_if_needed(task_info.get("suggested_project"))
+                    if project_id:
+                        self.logger.success(f"Created new project: '{project_name}' (ID: {project_id})")
+                    else:
+                        self.logger.warning(f"Failed to create suggested project: '{task_info['suggested_project'].get('name')}'")
+                
                 task_data = TaskData(
                     name=task_info.get("name", f"Voice Task {i+1}: {transcript[:50]}..."),
                     description=task_info.get("description", transcript),
                     status=task_info.get("status", "Inbox"),
                     priority=task_info.get("priority", "Medium"),
                     contexts=task_info.get("contexts", ["voice", "auto-processed"]),
-                    project_id=task_info.get("project_id"),
-                    project_name=task_info.get("project_name"),
-                    area_id=task_info.get("area_id"),
+                    project_node_id=project_id,
+                    project_name=project_name,
+                    area_node_id=task_info.get("area_node_id"),
                     area_name=task_info.get("area_name"),
-                    goal_id=task_info.get("goal_id"),
+                    goal_node_id=task_info.get("goal_node_id"),
                     goal_name=task_info.get("goal_name"),
                     source="voice",
                     metadata={
@@ -91,7 +104,8 @@ class ClaudeVoiceProcessor:
                         "reasoning": task_info.get("reasoning", ""),
                         "task_number": i + 1,
                         "total_tasks": len(tasks_data),
-                        "overall_reasoning": overall_reasoning
+                        "overall_reasoning": overall_reasoning,
+                        "project_created": task_info.get("create_project", False)
                     }
                 )
                 
@@ -130,9 +144,9 @@ class ClaudeVoiceProcessor:
         projects_text = ""
         if context.get("project_patterns"):
             project_list = []
-            for proj_id, proj_info in context["project_patterns"].items():
+            for proj_node_id, proj_info in context["project_patterns"].items():
                 project_list.append(
-                    f'- {proj_info["name"]} (Area: {proj_info["area_name"]})'
+                    f'- {proj_info["name"]} (Node ID: {proj_node_id}, Area: {proj_info["area_name"]})'
                 )
             if project_list:
                 projects_text = "Available projects:\\n" + "\\n".join(project_list[:20])  # Top 20
@@ -141,8 +155,8 @@ class ClaudeVoiceProcessor:
         areas_text = ""
         if context.get("area_descriptions"):
             area_list = []
-            for area_id, area_info in context["area_descriptions"].items():
-                area_list.append(f'- {area_info["name"]}')
+            for area_node_id, area_info in context["area_descriptions"].items():
+                area_list.append(f'- {area_info["name"]} (Node ID: {area_node_id})')
             if area_list:
                 areas_text = "Available areas:\\n" + "\\n".join(area_list)
         
@@ -197,7 +211,16 @@ CRITICAL INSTRUCTIONS FOR RELATIONSHIP DISCOVERY:
    - If unsure between two projects/areas, choose the most likely one and explain in reasoning
    - Look at similar recent tasks to understand patterns
 
-5. **Extract Context and Priority**:
+5. **Project Creation When None Found**:
+   - If you find a suitable area but NO matching project for a task, consider creating one
+   - Only suggest project creation when:
+     * The task clearly represents a cohesive project scope (e.g., "API integration", "feature development")
+     * An area exists that would logically contain this project
+     * The task is substantial enough to warrant its own project (not just a single quick action)
+   - Generate a meaningful project name and description based on the task context
+   - Set `create_project: true` and provide `suggested_project` details in the response
+
+6. **Extract Context and Priority**:
    - Contexts: location (@home, @office), tool (@computer, @phone), time (@evening)
    - Priority: Listen for urgency words ("urgent", "ASAP", "important", "quick")
 
@@ -242,10 +265,12 @@ Return a JSON response:
             "status": "Inbox",
             "priority": "Low|Medium|High|Urgent",
             "contexts": ["voice", "auto-processed", "@location", "@tool"],
-            "project_id": "notion_id if found",
+            "project_node_id": "node_id if found",
             "project_name": "Project name if found",
-            "area_id": "notion_id if found", 
+            "area_node_id": "node_id if found", 
             "area_name": "Area name if found",
+            "create_project": false,
+            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_node_id": "area_node_id"}},
             "confidence": 0.0-1.0,
             "reasoning": "Why this categorization was chosen for this task"
         }},
@@ -255,10 +280,12 @@ Return a JSON response:
             "status": "Inbox",
             "priority": "Low|Medium|High|Urgent",
             "contexts": ["voice", "auto-processed", "@location", "@tool"],
-            "project_id": "notion_id if found",
+            "project_node_id": "node_id if found",
             "project_name": "Project name if found", 
-            "area_id": "notion_id if found",
+            "area_node_id": "node_id if found",
             "area_name": "Area name if found",
+            "create_project": false,
+            "suggested_project": {{"name": "Project Name", "description": "Project Description", "area_node_id": "area_node_id"}},
             "confidence": 0.0-1.0,
             "reasoning": "Why this categorization was chosen for this task"
         }}
@@ -279,16 +306,18 @@ REMEMBER: Your goal is to create a well-connected knowledge graph. Every task sh
     
     def _execute_claude_with_mcp(self, prompt: str) -> Dict[str, Any]:
         """Execute Claude with MCP access for intelligent processing"""
-        # Define project_dir at the start to avoid scope issues
-        import os
-        original_cwd = os.getcwd()
         project_dir = "/home/mike/development/task-management"
         
+        # Build robust environment for subprocess
+        env = build_claude_env()
+        
+        # Run preflight check before executing
+        ok, error_msg = preflight_claude_ok(env)
+        if not ok:
+            self.logger.error(f"Claude preflight failed: {error_msg}")
+            return {"success": False, "error": f"Authentication failed: {error_msg}"}
+        
         try:
-            # Use Claude with project context and MCP access
-            # Use full path to claude command
-            claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
-            
             # Add instruction to use MCP tools
             full_prompt = f"""{prompt}
 
@@ -301,30 +330,35 @@ Remember to:
 3. Return ONLY the JSON response, no explanations"""
             
             cmd = [
-                claude_path, 
+                get_claude_path(), 
                 "-p", full_prompt,
                 "--dangerously-skip-permissions",
-                "--mcp-config", f"{project_dir}/.mcp.json",
+                "--mcp-config", ".mcp.json",
+                "--strict-mcp-config",  # Only use specified MCP servers
+                # Removed --debug flag as it corrupts JSON output
                 "--output-format", "json"
             ]
             
             self.logger.info(f"Executing Claude with MCP access")
             self.logger.debug(f"Prompt length: {len(full_prompt)} characters")
             
-            try:
-                os.chdir(project_dir)
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=None,  # No timeout - let Claude finish
-                    env={**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
-                )
-            finally:
-                os.chdir(original_cwd)
+            result = subprocess.run(
+                cmd,
+                cwd=project_dir,  # Use cwd parameter instead of os.chdir
+                capture_output=True,
+                text=True,
+                timeout=None,  # No timeout - let Claude finish
+                env=env
+            )
             
             if result.returncode != 0:
-                return {"success": False, "error": f"Claude execution failed: {result.stderr}"}
+                error_msg = f"Claude execution failed: {result.stderr}"
+                self.logger.claude_response(
+                    prompt=full_prompt,
+                    raw_output=result.stderr or "",
+                    error=error_msg
+                )
+                return {"success": False, "error": error_msg}
             
             # Parse JSON from Claude's response
             output = result.stdout.strip()
@@ -335,6 +369,8 @@ Remember to:
             
             # Extract JSON (Claude might include tool use output)
             import re
+            parsed_result = None
+            parse_error = None
             
             # First, check if this is a Claude Code execution result format
             try:
@@ -345,44 +381,61 @@ Remember to:
                     if isinstance(inner_result, str):
                         # Try to parse the inner result as JSON
                         try:
-                            return json.loads(inner_result)
+                            parsed_result = json.loads(inner_result)
                         except json.JSONDecodeError:
                             # Check if it's wrapped in markdown code blocks
                             json_block_match = re.search(r'```json\s*(.*?)\s*```', inner_result, re.DOTALL)
                             if json_block_match:
                                 try:
-                                    return json.loads(json_block_match.group(1))
+                                    parsed_result = json.loads(json_block_match.group(1))
                                 except json.JSONDecodeError:
                                     pass
                             # If inner result isn't JSON, fall through to regex extraction
                             pass
                     elif isinstance(inner_result, dict):
-                        return inner_result
+                        parsed_result = inner_result
             except json.JSONDecodeError:
                 pass
             
-            # Look for JSON with either "success" or "tasks" key
-            json_match = re.search(r'\{.*(?:"success"|"tasks").*\}', output, re.DOTALL)
-            if json_match:
-                try:
-                    return json.loads(json_match.group())
-                except json.JSONDecodeError:
-                    self.logger.error(f"Invalid JSON in match: {json_match.group()[:200]}")
-                    
-            # Fallback: try to parse the whole output
-            try:
-                return json.loads(output)
-            except:
-                # Try to extract JSON from Claude's response format
-                try:
-                    # Claude might wrap in ```json blocks
-                    json_block_match = re.search(r'```json\s*(.*?)\s*```', output, re.DOTALL)
-                    if json_block_match:
-                        return json.loads(json_block_match.group(1))
-                except:
-                    pass
-                    
-                self.logger.error(f"Failed to parse Claude response: {output[:500]}")
+            # If we didn't get a result yet, try other parsing methods
+            if parsed_result is None:
+                # Look for JSON with either "success" or "tasks" key
+                json_match = re.search(r'\{.*(?:"success"|"tasks").*\}', output, re.DOTALL)
+                if json_match:
+                    try:
+                        parsed_result = json.loads(json_match.group())
+                    except json.JSONDecodeError:
+                        parse_error = f"Invalid JSON in match: {json_match.group()[:200]}"
+                        
+                # Fallback: try to parse the whole output
+                if parsed_result is None:
+                    try:
+                        parsed_result = json.loads(output)
+                    except:
+                        # Try to extract JSON from Claude's response format
+                        try:
+                            # Claude might wrap in ```json blocks
+                            json_block_match = re.search(r'```json\s*(.*?)\s*```', output, re.DOTALL)
+                            if json_block_match:
+                                parsed_result = json.loads(json_block_match.group(1))
+                        except:
+                            pass
+            
+            # Log the Claude response for debugging
+            if parsed_result is not None:
+                self.logger.claude_response(
+                    prompt=full_prompt,
+                    raw_output=output,
+                    parsed_result=parsed_result
+                )
+                return parsed_result
+            else:
+                error_msg = parse_error or f"Failed to parse Claude response: {output[:500]}"
+                self.logger.claude_response(
+                    prompt=full_prompt,
+                    raw_output=output,
+                    error=error_msg
+                )
                 return {"success": False, "error": f"Invalid JSON response: {output[:200]}"}
                     
         except subprocess.TimeoutExpired as e:
@@ -418,3 +471,36 @@ Remember to:
         
         self.logger.info(f"Batch processing complete: {len(all_tasks)} total tasks from {len(transcripts)} transcripts")
         return all_tasks
+    
+    def _create_project_if_needed(self, suggested_project: Dict[str, Any]) -> Tuple[Optional[int], Optional[str]]:
+        """
+        Create a project if it doesn't exist and is deemed necessary
+        
+        Args:
+            suggested_project: Dict with name, description, area_node_id
+            
+        Returns:
+            Tuple of (project_node_id, project_name) if successful, (None, None) if failed
+        """
+        project_name = suggested_project.get("name")
+        project_description = suggested_project.get("description", "")
+        area_node_id = suggested_project.get("area_node_id")
+        
+        if not project_name:
+            return None, None
+        
+        self.logger.info(f"Creating new project: '{project_name}' in area node ID: {area_node_id}")
+        
+        try:
+            # Create project in GraphRAG only
+            project_node_id = self.adapter.create_project(project_name, project_description, area_node_id)
+            
+            if project_node_id:
+                return project_node_id, project_name
+            else:
+                return None, None
+                
+        except Exception as e:
+            self.logger.error(f"Error creating project '{project_name}': {e}")
+            return None, None
+    

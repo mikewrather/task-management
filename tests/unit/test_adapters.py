@@ -5,7 +5,6 @@ from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
 from voice_task_manager.adapters.base import TaskAdapter, TaskData
-from voice_task_manager.adapters.notion import NotionTaskAdapter
 from voice_task_manager.adapters.graphrag import GraphRAGTaskAdapter
 
 
@@ -20,11 +19,11 @@ class TestTaskData:
             status="Inbox",
             priority="High",
             contexts=["@home", "@computer"],
-            project_id="proj123",
+            project_node_id=123,
             project_name="Test Project",
-            area_id="area456",
+            area_node_id=456,
             area_name="Work",
-            goal_id="goal789",
+            goal_node_id=789,
             goal_name="Q4 Goals",
             source="voice",
             metadata={"voice_file_id": "file123"}
@@ -46,61 +45,10 @@ class TestTaskData:
         assert task.status == "Inbox"
         assert task.priority == "Medium"
         assert task.contexts == ['voice', 'auto-processed']  # Default contexts
-        assert task.project_id is None
+        assert task.project_node_id is None
         assert task.source == "voice"  # Default source
         assert task.created_at is not None
 
-
-class TestNotionTaskAdapter:
-    """Test Notion task adapter"""
-    
-    @pytest.fixture
-    def mock_notion(self):
-        """Mock Notion integration"""
-        with patch('voice_task_manager.adapters.notion.NotionClient') as mock:
-            yield mock
-    
-    @pytest.fixture
-    def adapter(self, mock_notion):
-        """Create adapter with mocked Notion"""
-        return NotionTaskAdapter()
-    
-    def test_create_task_success(self, adapter, mock_notion):
-        """Test successful task creation"""
-        # Setup
-        task_data = TaskData(
-            name="Test Task",
-            description="Test Description",
-            contexts=["@home"]
-        )
-        mock_notion.return_value.create_task.return_value = "task123"
-        
-        # Execute
-        result = adapter.create_task(task_data)
-        
-        # Verify
-        assert result == "task123"
-        mock_notion.return_value.create_task.assert_called_once()
-    
-    def test_create_task_with_relationships(self, adapter, mock_notion):
-        """Test task creation with project and area"""
-        # Setup
-        task_data = TaskData(
-            name="Test Task",
-            project_id="proj123",
-            area_id="area456"
-        )
-        mock_notion.return_value.create_task.return_value = "task123"
-        
-        # Execute
-        result = adapter.create_task(task_data)
-        
-        # Verify
-        assert result == "task123"
-        # Check that relationships were included in the call
-        call_args = mock_notion.return_value.create_task.call_args[1]
-        assert call_args.get("project_id") == "proj123"
-        assert call_args.get("area_id") == "area456"
 
 
 class TestGraphRAGTaskAdapter:

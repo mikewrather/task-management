@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Voice Task Management system that automatically converts voice recordings into organized Notion tasks using a multi-adapter architecture supporting both Notion and GraphRAG (Neo4j) storage backends. The system integrates Google Drive, OpenAI Whisper, Claude AI, and MCP (Model Context Protocol) servers.
+This is a Voice Task Management system that automatically converts voice recordings into organized tasks using pure GraphRAG (Neo4j) knowledge graph storage. The system integrates Google Drive, OpenAI Whisper, Claude AI, and MCP (Model Context Protocol) servers.
 
 ## Python Best Practices & Structure
 
@@ -80,14 +80,13 @@ mcp dev notion_mcp_server.py
 
 ### Core Components
 
-1. **Multi-Adapter Architecture** (`src/voice_task_manager/adapters/`)
+1. **GraphRAG Storage Architecture** (`src/voice_task_manager/adapters/`)
    - `base.py`: Defines TaskAdapter interface and TaskData model
-   - `notion.py`: Notion API integration for task storage
    - `graphrag.py`: GraphRAG/Neo4j integration for knowledge graph storage
-   - Both adapters can run simultaneously based on `.env` configuration
+   - Pure GraphRAG implementation for all task storage
 
 2. **Voice Processing Pipeline** (`src/voice_task_manager/core/processor_v2.py`)
-   - Enhanced processor supporting multiple storage adapters
+   - Enhanced processor with GraphRAG storage integration
    - Processes voice files through: Discovery → Download → Transcription → AI Analysis → Task Creation
    - Handles file cleanup and state management
 
@@ -98,7 +97,6 @@ mcp dev notion_mcp_server.py
 
 4. **MCP Servers** (`.mcp.json`)
    - **agent-db**: GraphRAG database operations via Neo4j
-   - **notion-task-management**: Custom Notion operations server
 
 ### Database Schema
 
@@ -112,30 +110,91 @@ mcp dev notion_mcp_server.py
 
 ## Critical Implementation Details
 
-### MCP Execution from Python
+### Claude Authentication
 
-When calling Claude with MCP tools from subprocess:
+**This system uses Claude Code CLI (native binary) to leverage the Claude Max plan via OAuth, NOT API credits.**
+
+#### Binary Selection
+- **ALWAYS use**: `/home/mike/.claude/local/claude` (native binary v1.0.83+)
+- **NEVER use**: NVM binary at `/home/mike/.nvm/versions/node/v24.2.0/bin/claude` (outdated)
+
+#### Authentication Methods
+
+**1. Interactive Development (Default)**
+- Relies on OAuth credentials at `~/.claude/.credentials.json`
+- Authenticate with: `claude login`
+- Credentials persist for 30-90 days
+- Subprocess must have `HOME` environment variable set to find credentials
+
+**2. Headless/CI Environments**
+- Generate long-lived token: `claude setup-token`
+- Export token: `export CLAUDE_CODE_OAUTH_TOKEN="Claude-..."`
+- Token works without interactive login
+
+#### MCP Execution from Python
+
+Use the shared utility for robust subprocess execution:
 
 ```python
-# CORRECT: Change to project directory first
-os.chdir("/home/mike/development/task-management")
-cmd = [
-    "/home/mike/.nvm/versions/node/v24.2.0/bin/claude",
-    "-p", prompt,  # -p takes the PROMPT text, NOT project name!
-    "--dangerously-skip-permissions",
-    "--output-format", "json"
-]
-# Set timeout=None for long-running MCP operations (30-60s typical)
-result = subprocess.run(cmd, timeout=None, capture_output=True, text=True)
+from voice_task_manager.utils.claude_cli import execute_claude_command
+
+# Automatic preflight check, environment setup, and error handling
+success, stdout, stderr = execute_claude_command(
+    prompt="Your prompt here",
+    mcp_config=".mcp.json",
+    timeout=None  # No timeout for long MCP operations
+)
 ```
 
-### Adapter Configuration
+Or use the lower-level utilities:
+
+```python
+from voice_task_manager.utils.claude_cli import get_claude_path, build_claude_env, preflight_claude_ok
+
+# Build robust environment
+env = build_claude_env()
+
+# Run preflight check
+ok, error_msg = preflight_claude_ok(env)
+if not ok:
+    print(f"Auth failed: {error_msg}")
+    # Fall back to mock or handle error
+
+# Execute command
+cmd = [
+    get_claude_path(),  # Always returns native binary
+    "-p", prompt,
+    "--dangerously-skip-permissions",
+    "--mcp-config", ".mcp.json",
+    "--strict-mcp-config",
+    "--debug",  # Use --debug not --mcp-debug
+    "--output-format", "json"
+]
+result = subprocess.run(cmd, cwd=PROJECT_DIR, env=env, capture_output=True, text=True, timeout=None)
+```
+
+#### Troubleshooting Authentication
+
+**If subprocess authentication fails:**
+1. Check Claude binary: `/home/mike/.claude/local/claude --version`
+2. Verify credentials exist: `ls -la ~/.claude/.credentials.json`
+3. Test authentication: `python scripts/debug/test_claude_auth.py`
+4. Check MCP access: `USE_REAL_MCP=true python scripts/debug/test_mcp_connection.py`
+
+**Common Issues:**
+- Missing HOME environment → Can't find credentials
+- Using wrong binary → Outdated CLI version
+- Expired OAuth token → Run `claude login` again
+- Deprecated flags → Use `--debug` not `--mcp-debug`
+
+### GraphRAG Configuration
 
 In `.env`:
 ```bash
-# Enable/disable adapters
-ENABLE_NOTION_ADAPTER=true
-ENABLE_GRAPHRAG_ADAPTER=true
+# GraphRAG Configuration (Required)
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USER=neo4j
+NEO4J_PASSWORD=your_password
 
 # Use real MCP vs mock implementation
 USE_REAL_MCP=true  # Set to false for testing without MCP servers

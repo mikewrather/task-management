@@ -14,7 +14,7 @@ from contextlib import contextmanager
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="sqlite3")
 
 from ..models.voice_file import VoiceFile
-from ..models.task import NotionTask
+from ..models.task import Task
 
 class VoiceDatabase:
     """Enhanced database operations for voice processing system"""
@@ -257,7 +257,7 @@ class VoiceDatabase:
     
     # Task Operations
     
-    def save_task(self, task: NotionTask) -> None:
+    def save_task(self, task: Task) -> None:
         """Save or update a task record"""
         with self.get_connection() as conn:
             conn.execute('''
@@ -280,7 +280,7 @@ class VoiceDatabase:
             ))
             conn.commit()
     
-    def get_task(self, task_id: str) -> Optional[NotionTask]:
+    def get_task(self, task_id: str) -> Optional[Task]:
         """Get a task by ID"""
         with self.get_connection() as conn:
             row = conn.execute(
@@ -292,7 +292,7 @@ class VoiceDatabase:
                 return self._row_to_task(row)
             return None
     
-    def get_tasks_by_voice_file(self, file_id: str) -> List[NotionTask]:
+    def get_tasks_by_voice_file(self, file_id: str) -> List[Task]:
         """Get all tasks created from a specific voice file"""
         with self.get_connection() as conn:
             rows = conn.execute(
@@ -343,15 +343,15 @@ class VoiceDatabase:
             archived_at=datetime.fromisoformat(row_dict['archived_at']) if row_dict.get('archived_at') else None
         )
     
-    def _row_to_task(self, row) -> NotionTask:
-        """Convert database row to NotionTask object"""
+    def _row_to_task(self, row) -> Task:
+        """Convert database row to Task object"""
         # Convert row to dict to handle both sqlite3.Row and dict objects
         if hasattr(row, 'keys'):
             row_dict = dict(row)
         else:
             row_dict = row
             
-        return NotionTask(
+        return Task(
             task_id=row_dict['task_id'],
             title=row_dict['title'],
             content=row_dict.get('content', ''),

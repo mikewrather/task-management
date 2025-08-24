@@ -197,7 +197,6 @@ class SystemStatus:
         # Check for required environment variables
         required_vars = [
             'OPENAI_API_KEY',
-            'NOTION_TOKEN', 
             'GOOGLE_DRIVE_FOLDER_ID'
         ]
         
@@ -499,44 +498,7 @@ class SystemStatus:
                 details="Set OPENAI_API_KEY in .env"
             ))
         
-        # Notion API check
-        notion_key = os.getenv('NOTION_TOKEN')
-        if notion_key:
-            try:
-                import requests
-                headers = {
-                    'Authorization': f'Bearer {notion_key}',
-                    'Notion-Version': '2022-06-28'
-                }
-                response = requests.get('https://api.notion.com/v1/users/me', headers=headers, timeout=10)
-                if response.status_code == 200:
-                    components.append(SystemComponent(
-                        name="Notion API",
-                        status=ServiceStatus.HEALTHY,
-                        message="Connected",
-                        details="API key valid"
-                    ))
-                else:
-                    components.append(SystemComponent(
-                        name="Notion API",
-                        status=ServiceStatus.CRITICAL,
-                        message=f"API error ({response.status_code})",
-                        details="Invalid API key or permissions"
-                    ))
-            except Exception as e:
-                components.append(SystemComponent(
-                    name="Notion API",
-                    status=ServiceStatus.CRITICAL,
-                    message="Connection failed",
-                    details=str(e)
-                ))
-        else:
-            components.append(SystemComponent(
-                name="Notion API",
-                status=ServiceStatus.WARNING,
-                message="No API key configured",
-                details="Set NOTION_TOKEN in .env"
-            ))
+        # Notion removed - using pure GraphRAG now
         
         return components
     
@@ -948,7 +910,7 @@ echo "----------------------------------------" >> "{self.log_path}"
         lines.append("📋 Summary:")
         lines.append("  • Checks for new voice files every 5 minutes")
         lines.append("  • Processes audio files automatically via vtm package")
-        lines.append("  • Creates tasks in Notion")
+        lines.append("  • Creates tasks in GraphRAG knowledge graph")
         lines.append("  • Tracks processed files to avoid duplicates")
         lines.append(f"  • Logs everything to: {self.log_path}")
         lines.append("")

@@ -68,6 +68,7 @@ class VoiceLogger:
         self.main_log = self.log_dir / 'voice-automation.log'
         self.run_history_log = self.log_dir / 'cron-run-history.log'
         self.error_log = self.log_dir / 'voice-errors.log'
+        self.claude_log = self.log_dir / 'claude-responses.log'
         
         # Initialize rich console if available
         self.console = Console() if HAS_RICH else None
@@ -178,6 +179,48 @@ class VoiceLogger:
         self._print_message(formatted, "green")
         self._write_to_file(self.main_log, formatted)
     
+    def claude_response(self, prompt: str, raw_output: str, parsed_result: Dict[str, Any] = None, 
+                       error: str = None, **kwargs) -> None:
+        """
+        Log Claude AI response with full context for debugging
+        
+        Args:
+            prompt: The prompt sent to Claude
+            raw_output: Raw response from Claude
+            parsed_result: Parsed JSON result (if successful)
+            error: Error message (if parsing failed)
+            **kwargs: Additional context (e.g., voice_file_id, transcript_length)
+        """
+        import hashlib
+        
+        # Create a hash of the prompt for easy identification
+        prompt_hash = hashlib.md5(prompt.encode()).hexdigest()[:8]
+        
+        # Build Claude response entry
+        claude_entry = {
+            'timestamp': datetime.now().isoformat(),
+            'prompt_hash': prompt_hash,
+            'prompt_length': len(prompt),
+            'raw_output_length': len(raw_output) if raw_output else 0,
+            'context': kwargs,
+            'success': error is None,
+            'error': error,
+            'parsed_tasks_count': len(parsed_result.get('tasks', [])) if parsed_result else 0,
+            'raw_output': raw_output,
+            'parsed_result': parsed_result
+        }
+        
+        # Log to Claude-specific file
+        self._write_to_file(self.claude_log, json.dumps(claude_entry))
+        
+        # Also log summary to main log
+        status = "✅ SUCCESS" if error is None else "❌ ERROR"
+        task_count = len(parsed_result.get('tasks', [])) if parsed_result else 0
+        summary_msg = f"Claude response: {status}, {task_count} tasks, hash={prompt_hash}"
+        formatted = self._format_message("🤖 CLAUDE", summary_msg, **kwargs)
+        self._print_message(formatted, "blue" if error is None else "red")
+        self._write_to_file(self.main_log, formatted)
+    
     def update_run_stats(self, files_found: Optional[int] = None, 
                         files_processed: Optional[int] = None) -> None:
         """Update current run statistics"""
@@ -281,7 +324,8 @@ class VoiceLogger:
         for name, path in [
             ('main_log', self.main_log),
             ('run_history', self.run_history_log),
-            ('error_log', self.error_log)
+            ('error_log', self.error_log),
+            ('claude_log', self.claude_log)
         ]:
             if path.exists():
                 stat = path.stat()
@@ -310,7 +354,7 @@ class VoiceLogger:
         """
         max_size_bytes = max_size_mb * 1024 * 1024
         
-        for log_file in [self.main_log, self.error_log]:
+        for log_file in [self.main_log, self.error_log, self.claude_log]:
             if log_file.exists() and log_file.stat().st_size > max_size_bytes:
                 self._rotate_single_log(log_file, keep_backups)
     

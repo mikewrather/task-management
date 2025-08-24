@@ -15,7 +15,7 @@ from voice_task_manager.utils.notifications import (
     NotificationConfig
 )
 from voice_task_manager.models.voice_file import VoiceFile
-from voice_task_manager.models.task import NotionTask
+from voice_task_manager.models.task import Task
 
 
 class TestNotificationConfig:
@@ -70,8 +70,8 @@ class TestVoiceNotificationSystem:
     
     @pytest.fixture
     def sample_task(self):
-        """Create a sample NotionTask for testing"""
-        return NotionTask(
+        """Create a sample Task for testing"""
+        return Task(
             task_id="test_task_123",
             title="Test Task from Voice",
             content="This is a test task created from voice recording",

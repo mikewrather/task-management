@@ -8,17 +8,17 @@ from datetime import datetime
 
 @dataclass
 class TaskData:
-    """Standardized task data structure for all adapters"""
+    """Standardized task data structure for GraphRAG storage"""
     name: str
     description: Optional[str] = None
     status: str = "Inbox"
     priority: str = "Medium"
     contexts: List[str] = None
-    project_id: Optional[str] = None
+    project_node_id: Optional[int] = None
     project_name: Optional[str] = None
-    area_id: Optional[str] = None
+    area_node_id: Optional[int] = None
     area_name: Optional[str] = None
-    goal_id: Optional[str] = None
+    goal_node_id: Optional[int] = None
     goal_name: Optional[str] = None
     source: str = "voice"
     created_at: datetime = None
