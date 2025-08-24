@@ -159,7 +159,7 @@ class ClaudeSessionManager:
                 get_claude_path(),
                 "-p", "Return only: OK",
                 "--dangerously-skip-permissions",
-                "--debug",  # Use --debug for better diagnostics
+                # Removed --debug flag as it can corrupt JSON output
                 "--output-format", "json"
             ]
             

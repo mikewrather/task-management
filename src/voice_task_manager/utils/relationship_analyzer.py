@@ -74,20 +74,13 @@ class RelationshipAnalyzer:
         """
         self.logger = logger or VoiceLogger()
         self.graphrag_adapter = None
-        self.notion_adapter = None
         
-        # Initialize adapters if available
+        # Initialize GraphRAG adapter
         try:
             from ..adapters.graphrag import GraphRAGTaskAdapter
             self.graphrag_adapter = GraphRAGTaskAdapter(logger=self.logger)
         except Exception as e:
             self.logger.warning(f"GraphRAG adapter not available: {e}")
-        
-        try:
-            # Notion adapter removed - using pure GraphRAG now
-            self.notion_adapter = None
-        except Exception as e:
-            self.logger.warning(f"Notion adapter not available: {e}")
     
     def find_orphaned_tasks(self, min_confidence: float = 0.7) -> List[TaskRelationship]:
         """
@@ -311,13 +304,7 @@ class RelationshipAnalyzer:
             except Exception as e:
                 self.logger.error(f"Error getting GraphRAG tasks: {e}")
         
-        # Get tasks from Notion (if needed)
-        if self.notion_adapter:
-            try:
-                notion_tasks = self._get_notion_tasks()
-                all_tasks.extend(notion_tasks)
-            except Exception as e:
-                self.logger.error(f"Error getting Notion tasks: {e}")
+        # Pure GraphRAG implementation - no other sources needed
         
         return all_tasks
     
@@ -384,9 +371,7 @@ class RelationshipAnalyzer:
         
         return tasks
     
-    def _get_notion_tasks(self) -> List[Dict[str, Any]]:
-        """Get all tasks from Notion (placeholder for future implementation)"""
-        return []  # TODO: Implement when Notion querying is available
+    # Notion support removed - using pure GraphRAG now
     
     def _analyze_task_relationships(self, task: Dict[str, Any], min_confidence: float = 0.5) -> Optional[TaskRelationship]:
         """
@@ -469,7 +454,7 @@ class RelationshipAnalyzer:
                 if score > best_score:
                     best_score = score
                     best_match = {
-                        "id": result.get("notion_id", result.get("id")),
+                        "id": result.get("id"),
                         "name": result.get("name"),
                         "description": result.get("description", ""),
                         "score": score
@@ -506,7 +491,7 @@ class RelationshipAnalyzer:
                 if score > best_score:
                     best_score = score
                     best_match = {
-                        "id": result.get("notion_id", result.get("id")),
+                        "id": result.get("id"),
                         "name": result.get("name"),
                         "score": score
                     }

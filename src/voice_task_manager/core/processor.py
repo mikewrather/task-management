@@ -1,34 +1,39 @@
 """
-Voice Processing Core
-Enhanced main automation logic for processing voice recordings.
-
-This module replaces the script-based automated-voice-processor.py with a
-clean, testable, and well-structured class-based implementation.
+Voice Processing Core V2 - Multi-platform support with intelligent categorization
 """
 
 import os
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 
 from ..models.voice_file import VoiceFile
-from ..models.task import Task
 from ..integrations.drive import GoogleDriveClient
 from ..integrations.whisper import WhisperClient
-# from ..integrations.notion import # NotionClient  # Removed - using pure GraphRAG now  # Removed - using pure GraphRAG now
 from ..utils.logging import VoiceLogger
 from ..utils.database import VoiceDatabase
 
-class VoiceProcessor:
+# Adapters
+from ..adapters.base import TaskAdapter, TaskData
+from ..adapters.graphrag import GraphRAGTaskAdapter
+
+# Processors
+from ..processors.claude_processor import ClaudeVoiceProcessor
+
+
+class VoiceProcessorV2:
     """
-    Enhanced voice processing automation system
+    Enhanced voice processing with multi-platform support and intelligent categorization
     
     This class orchestrates the entire voice-to-task pipeline:
     1. Discover voice files in Google Drive
     2. Download and validate audio content
     3. Transcribe using OpenAI Whisper
-    4. Create Notion tasks
-    5. Track processing state and cleanup
+    4. Process with Claude for intelligent categorization
+    5. Create tasks in configured storage systems
+    6. Track processing state and cleanup
     """
     
     def __init__(self, project_root: Optional[Path] = None):
@@ -52,12 +57,22 @@ class VoiceProcessor:
         # Load environment configuration first
         self._load_environment()
         
+        # Initialize adapters based on configuration
+        self.adapters = self._initialize_adapters()
+        
+        # Initialize processors
+        self.use_claude_processor = os.getenv('USE_CLAUDE_PROCESSOR', 'true').lower() == 'true'
+        if self.use_claude_processor:
+            # Use GraphRAG adapter for Claude processor context
+            graphrag_adapter = next((a for a in self.adapters if isinstance(a, GraphRAGTaskAdapter)), None)
+            if not graphrag_adapter:
+                graphrag_adapter = GraphRAGTaskAdapter(logger=self.logger)
+            self.claude_processor = ClaudeVoiceProcessor(adapter=graphrag_adapter, logger=self.logger)
+        
         # Initialize API clients
         try:
             self.drive_client = GoogleDriveClient(logger=self.logger)
             self.whisper_client = WhisperClient(logger=self.logger)
-            # self.notion_client = NotionClient(logger=self.logger)  # Removed - using pure GraphRAG now
-            self.notion_client = None
         except ValueError as e:
             self.logger.error("Failed to initialize API clients", exception=e)
             raise
@@ -77,13 +92,45 @@ class VoiceProcessor:
                             continue
         
         # Validate required environment variables
-        required_vars = ['OPENAI_API_KEY', 'NOTION_TOKEN', 'NOTION_TASKS_DB']
+        required_vars = ['OPENAI_API_KEY']
+        
+        # No adapter-specific requirements for GraphRAG (MCP handles auth)
+        
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         
         if missing_vars:
             raise ValueError(f"Missing required environment variables: {missing_vars}")
         
         self.logger.debug("Environment configuration loaded successfully")
+    
+    def _initialize_adapters(self) -> List[TaskAdapter]:
+        """Initialize GraphRAG storage adapter"""
+        adapters = []
+        
+        # GraphRAG adapter (now the only storage system)
+        try:
+            graphrag_adapter = GraphRAGTaskAdapter(logger=self.logger)
+            if graphrag_adapter.test_connection():
+                adapters.append(graphrag_adapter)
+                self.logger.info("GraphRAG adapter initialized")
+            else:
+                self.logger.warning("GraphRAG adapter connection test failed")
+        except Exception as e:
+            self.logger.error("Failed to initialize GraphRAG adapter", exception=e)
+        
+        if not adapters:
+            raise ValueError("GraphRAG adapter could not be initialized")
+        
+        return adapters
+    
+    def run_automation(self) -> Dict[str, Any]:
+        """
+        Run automated voice processing cycle
+        
+        Returns:
+            Dictionary containing processing results
+        """
+        return self.process_all_files(dry_run=False)
     
     def process_all_files(self, dry_run: bool = False) -> Dict[str, Any]:
         """
@@ -156,7 +203,8 @@ class VoiceProcessor:
             
             # Generate comprehensive run summary
             additional_data = {
-                'database_url': self.notion_client.format_database_url(),
+                'adapters_used': [type(a).__name__ for a in self.adapters],
+                'claude_processor_enabled': self.use_claude_processor,
                 'dry_run': dry_run,
                 'unprocessed_files': len(unprocessed_files),
                 'notification_system_available': self._is_notification_system_available()
@@ -185,7 +233,7 @@ class VoiceProcessor:
                 'unprocessed_found': len(unprocessed_files),
                 'results': results,
                 'run_summary': summary,
-                'database_url': additional_data['database_url'],
+                'adapters': additional_data['adapters_used'],
                 'dry_run': dry_run
             }
             
@@ -280,27 +328,81 @@ class VoiceProcessor:
             transcript_text = transcription_result['text']
             duration = transcription_result.get('duration', 0)
             
-            # Step 4: Create Notion task
-            notion_task = self.notion_client.create_task_from_voice(voice_file, transcript_text)
-            if not notion_task:
-                voice_file.mark_failed("Failed to create Notion task")
+            # Step 4: Process with Claude if enabled
+            tasks_to_create = []
+            if self.use_claude_processor:
+                task_data_list = self.claude_processor.process_transcript(
+                    transcript_text, 
+                    voice_file.file_id
+                )
+                if not task_data_list:
+                    # Fallback to basic processing
+                    tasks_to_create = [self._create_basic_task_data(transcript_text)]
+                else:
+                    tasks_to_create = task_data_list
+            else:
+                tasks_to_create = [self._create_basic_task_data(transcript_text)]
+            
+            # Step 5: Create tasks in all configured adapters
+            all_created_tasks = []
+            for task_data in tasks_to_create:
+                created_tasks = []
+                for adapter in self.adapters:
+                    try:
+                        task_id = adapter.create_task(task_data)
+                        if task_id:
+                            created_tasks.append({
+                                'adapter': type(adapter).__name__,
+                                'task_id': task_id
+                            })
+                            self.logger.success(
+                                f"Task '{task_data.name}' created in {type(adapter).__name__}",
+                                task_id=task_id
+                            )
+                    except Exception as e:
+                        self.logger.error(
+                            f"Failed to create task '{task_data.name}' in {type(adapter).__name__}",
+                            exception=e
+                        )
+                
+                if created_tasks:
+                    all_created_tasks.extend(created_tasks)
+            
+            if not all_created_tasks:
+                voice_file.mark_failed("Failed to create any tasks in any adapter")
                 self.database.save_voice_file(voice_file)
                 return None
             
-            # Step 5: Mark as completed and save
-            voice_file.mark_completed(transcript_text, notion_task.url, duration)
+            # Step 6: Mark as completed and save
+            # For multiple tasks, use a summary URL or first task URL
+            if len(tasks_to_create) > 1:
+                task_url = f"Created {len(tasks_to_create)} tasks"
+            else:
+                # Try to get URL from first created task
+                task_url = all_created_tasks[0].get('task_url', 'Multiple adapters') if all_created_tasks else 'Multiple adapters'
+            
+            voice_file.mark_completed(transcript_text, task_url, duration)
             self.database.save_voice_file(voice_file)
             
-            # Save the Notion task to database
-            self.database.save_task(notion_task)
+            self.logger.success(
+                f"File processing completed successfully: {len(tasks_to_create)} tasks created", 
+                file_id=voice_file.file_id
+            )
             
-            self.logger.success("File processing completed successfully", file_id=voice_file.file_id)
-            
+            # Return info about all created tasks
             return {
                 'file_id': voice_file.file_id,
                 'transcript': transcript_text,
-                'task_url': notion_task.url,
-                'task_id': notion_task.task_id,
+                'created_tasks': all_created_tasks,
+                'tasks_created': len(tasks_to_create),
+                'task_summaries': [
+                    {
+                        'name': task.name,
+                        'project': task.project_name,
+                        'area': task.area_name,
+                        'priority': task.priority
+                    } for task in tasks_to_create
+                ],
                 'duration': duration,
                 'transcript_length': len(transcript_text),
                 'word_count': transcription_result.get('word_count', 0),
@@ -319,9 +421,22 @@ class VoiceProcessor:
             )
             return None
     
+    def _create_basic_task_data(self, transcript: str) -> TaskData:
+        """Create basic task data without intelligent categorization"""
+        title_text = transcript[:60] + "..." if len(transcript) > 60 else transcript
+        
+        return TaskData(
+            name=f"Voice Note: {title_text}",
+            description=transcript,
+            status="Inbox",
+            priority="Medium",
+            contexts=["voice", "auto-processed"],
+            source="voice"
+        )
+    
     def _cleanup_processed_file(self, voice_file: VoiceFile) -> None:
         """Handle cleanup of processed voice files"""
-        cleanup_success = self.drive_client.cleanup_processed_file(voice_file)
+        cleanup_success = self.drive_client.cleanup_processed_file(voice_file, cleanup_method='move')
         
         if cleanup_success:
             self.logger.success("File cleanup completed", file_id=voice_file.file_id)
@@ -331,37 +446,47 @@ class VoiceProcessor:
     def _send_notification(self, voice_file: VoiceFile, success: bool) -> None:
         """Send desktop notification about processing result"""
         try:
-            from ..utils.notifications import notify_success, notify_error
+            notification_script = self.project_root / 'scripts' / 'notification-system.py'
+            if not notification_script.exists():
+                return
             
             if success:
                 # Get the processed file info for notification
                 processed_file = self.database.get_voice_file(voice_file.file_id)
-                if processed_file and processed_file.transcript and processed_file.task_url:
-                    # Create a simple task object for notification
-                    from ..models.task import Task
-                    task = Task(
-                        id="",  # Not needed for notification
-                        url=processed_file.task_url,
-                        name=processed_file.transcript[:100]
-                    )
-                    notify_success(processed_file, task)
+                if processed_file and processed_file.transcript:
+                    subprocess.run([
+                        sys.executable, str(notification_script), 'success',
+                        voice_file.file_id, 
+                        processed_file.transcript[:100], 
+                        "Task created"
+                    ], check=False, timeout=10)
             else:
-                notify_error(voice_file.file_id, "Processing failed")
+                subprocess.run([
+                    sys.executable, str(notification_script), 'error',
+                    voice_file.file_id,
+                    "Processing failed",
+                    ""
+                ], check=False, timeout=10)
                 
         except Exception as e:
             self.logger.warning("Desktop notification failed", exception=e, file_id=voice_file.file_id)
     
     def _is_notification_system_available(self) -> bool:
         """Check if the notification system is available"""
-        try:
-            from ..utils.notifications import VoiceNotificationSystem
-            return True
-        except ImportError:
-            return False
+        notification_script = self.project_root / 'scripts' / 'notification-system.py'
+        return notification_script.exists()
     
     def get_processing_stats(self) -> Dict[str, Any]:
         """Get comprehensive processing statistics"""
-        return self.database.get_processing_stats()
+        stats = self.database.get_processing_stats()
+        
+        # Add adapter statistics
+        stats['adapters'] = {
+            'configured': [type(a).__name__ for a in self.adapters],
+            'claude_processor': self.use_claude_processor
+        }
+        
+        return stats
     
     def test_system_health(self) -> Dict[str, Any]:
         """
@@ -406,17 +531,27 @@ class VoiceProcessor:
             }
             health_results['overall_health'] = 'degraded'
         
-        # Test Notion API
-        notion_test = self.notion_client.test_connection()
-        health_results['components']['notion'] = {
-            'status': 'healthy' if (notion_test['api_connection'] and notion_test['database_access']) else 'error',
-            'api_connection': notion_test['api_connection'],
-            'database_access': notion_test['database_access'],
-            'errors': notion_test['errors']
-        }
-        
-        if notion_test['errors']:
-            health_results['overall_health'] = 'degraded'
+        # Test adapters
+        health_results['components']['adapters'] = {}
+        for adapter in self.adapters:
+            adapter_name = type(adapter).__name__
+            try:
+                if adapter.test_connection():
+                    health_results['components']['adapters'][adapter_name] = {
+                        'status': 'healthy'
+                    }
+                else:
+                    health_results['components']['adapters'][adapter_name] = {
+                        'status': 'error',
+                        'error': 'Connection test failed'
+                    }
+                    health_results['overall_health'] = 'degraded'
+            except Exception as e:
+                health_results['components']['adapters'][adapter_name] = {
+                    'status': 'error',
+                    'error': str(e)
+                }
+                health_results['overall_health'] = 'degraded'
         
         # Test OpenAI (basic validation)
         try:
@@ -431,5 +566,12 @@ class VoiceProcessor:
                 'error': str(e)
             }
             health_results['overall_health'] = 'degraded'
+        
+        # Test Claude processor if enabled
+        if self.use_claude_processor:
+            health_results['components']['claude_processor'] = {
+                'status': 'enabled',
+                'adapter': 'GraphRAG'
+            }
         
         return health_results

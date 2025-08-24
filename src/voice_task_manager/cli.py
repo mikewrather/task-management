@@ -35,16 +35,10 @@ def process(ctx: click.Context, dry_run: bool, verbose: bool) -> None:
     console.print("🎤 Starting voice processing pipeline...")
     
     try:
-        # Import here to avoid circular imports and allow for lazy loading
-        # Try to use V2 processor if available, otherwise fall back to V1
-        try:
-            from .core.processor_v2 import VoiceProcessorV2
-            processor = VoiceProcessorV2()
-            console.print("🚀 Using enhanced processor with multi-platform support")
-        except ImportError:
-            from .core.processor import VoiceProcessor
-            processor = VoiceProcessor()
-            console.print("📋 Using standard processor")
+        # Import the GraphRAG-enabled processor
+        from .core.processor import VoiceProcessorV2
+        processor = VoiceProcessorV2()
+        console.print("🚀 Using GraphRAG processor with entity managers")
         
         results = processor.process_all_files(dry_run=dry_run)
         
@@ -469,13 +463,7 @@ def archive(ctx: click.Context, list_files: bool, mark: Optional[str],
             console.print("\n[dim]Stack trace:[/dim]")
             console.print(traceback.format_exc())
 
-# Add query commands (list, search, filter)
-try:
-    from .commands.query_commands import query
-    main.add_command(query, name='list')
-except ImportError as e:
-    # Query commands not available - this is expected during development
-    console.print(f"[dim]Query commands not available: {e}[/dim]")
+# Query commands removed - using pure GraphRAG now
 
 
 @main.command()

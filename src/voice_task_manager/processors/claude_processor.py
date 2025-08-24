@@ -335,7 +335,7 @@ Remember to:
                 "--dangerously-skip-permissions",
                 "--mcp-config", ".mcp.json",
                 "--strict-mcp-config",  # Only use specified MCP servers
-                "--debug",  # Use --debug instead of deprecated flags
+                # Removed --debug flag as it corrupts JSON output
                 "--output-format", "json"
             ]
             

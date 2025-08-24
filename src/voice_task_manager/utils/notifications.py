@@ -152,7 +152,7 @@ class VoiceNotificationSystem:
                 'desktop_title': '🎤 Voice Note Processed',
                 'desktop_message': 'Created task: {short_transcript}',
                 'email_subject': 'Voice Note Processed Successfully',
-                'email_body': '''Your voice note has been processed and added to Notion:
+                'email_body': '''Your voice note has been processed and added to GraphRAG:
 
 Transcript: {transcript}
 
@@ -193,7 +193,7 @@ Total: {total_count} files processed
 Recent Activity:
 {recent_activity}
 
-📋 View all tasks: https://www.notion.so/183267fb-e1c1-4b3b-a42a-5ac1ab8353eb
+📋 View system status: vtm status
 
 ---
 Voice Task Management System''',
@@ -541,7 +541,7 @@ Voice Task Management System''',
             'file_id': 'test_file_123',
             'transcript': 'This is a test notification from the Voice Task Manager system.',
             'short_transcript': 'This is a test notification...',
-            'task_url': 'https://notion.so/test-task',
+            'task_url': 'graphrag://test-task',
             'processed_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
             'error_message': 'Test error message',
             'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S')

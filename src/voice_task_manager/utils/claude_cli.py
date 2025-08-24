@@ -33,6 +33,7 @@ def build_claude_env(base_env: Dict[str, str] | None = None) -> Dict[str, str]:
     - HOME is set so CLI can find ~/.claude/.credentials.json
     - PYTHONPATH includes project source
     - PATH includes native Claude binary directory
+    - Removes ANTHROPIC_API_KEY to prevent API credit usage
     
     Args:
         base_env: Base environment to extend (defaults to os.environ)
@@ -44,6 +45,16 @@ def build_claude_env(base_env: Dict[str, str] | None = None) -> Dict[str, str]:
     
     # Critical: Set HOME so Claude can find credentials
     env.setdefault("HOME", str(Path.home()))
+    
+    # IMPORTANT: Remove ANTHROPIC_API_KEY to ensure OAuth is used instead of API credits
+    # The API key causes "Credit balance too low" errors when credits are exhausted
+    if "ANTHROPIC_API_KEY" in env:
+        del env["ANTHROPIC_API_KEY"]
+    
+    # Pass through OAuth token if available (for headless operation)
+    # This takes precedence over on-disk credentials
+    if "CLAUDE_CODE_OAUTH_TOKEN" in os.environ:
+        env["CLAUDE_CODE_OAUTH_TOKEN"] = os.environ["CLAUDE_CODE_OAUTH_TOKEN"]
     
     # Add project source to Python path
     env["PYTHONPATH"] = f"{PROJECT_DIR}/src:{env.get('PYTHONPATH', '')}"
@@ -79,8 +90,8 @@ def preflight_claude_ok(env: Dict[str, str] | None = None, timeout: int = 30) ->
     cmd = [
         get_claude_path(),
         "-p", "Return only: OK",
-        "--output-format", "json",
-        "--debug"  # Use --debug instead of deprecated --mcp-debug
+        "--output-format", "json"
+        # Removed --debug flag as it can corrupt JSON output
     ]
     
     try:
@@ -98,7 +109,11 @@ def preflight_claude_ok(env: Dict[str, str] | None = None, timeout: int = 30) ->
         else:
             # Extract error message from stderr or stdout
             error_msg = result.stderr or result.stdout or "Unknown error"
-            if "404" in error_msg and "opusplan" in error_msg.lower():
+            
+            # Check for credit balance issues (indicates API key usage instead of OAuth)
+            if "credit balance" in error_msg.lower() or "credit" in error_msg.lower() and "low" in error_msg.lower():
+                return False, "Authentication failed: API key detected with exhausted credits. OAuth should be used for Max plan."
+            elif "404" in error_msg and "opusplan" in error_msg.lower():
                 return False, "Authentication failed: Max plan not available (404 opusplan)"
             elif "credentials" in error_msg.lower():
                 return False, f"Authentication failed: Credentials not found or invalid"
@@ -143,7 +158,7 @@ def execute_claude_command(
         "--dangerously-skip-permissions",
         "--mcp-config", mcp_config,
         "--strict-mcp-config",  # Only use specified MCP servers
-        "--debug",  # Use --debug for better diagnostics
+        # Removed --debug flag as it corrupts JSON output
         "--output-format", "json"
     ]
     
