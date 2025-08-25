@@ -19,7 +19,7 @@ The **MCP Inspector** is the official visual testing tool for MCP servers, provi
 # Activate uv environment
 source .venv/bin/activate
 
-# Start inspector with MCP CLI
+# Start inspector with MCP CLI (requires uv installation)
 mcp dev notion_mcp_server.py
 ```
 

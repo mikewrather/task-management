@@ -187,15 +187,8 @@ source .venv/bin/activate
 uv pip install -e ".[dev,mcp,all]"
 ```
 
-### **Using pip (Legacy)**
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# Install package
-pip install -e ".[dev]"
-```
+### **Note on pip**
+This project uses UV exclusively for package management. Do not use pip or venv - all dependencies are managed through UV and pyproject.toml.
 
 ---
 

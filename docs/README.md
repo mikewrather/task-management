@@ -17,13 +17,9 @@ The voice task management system is a fully automated Python package that conver
 ### 🔧 [Specifications](specifications/)
 Technical specifications, feature plans, and system requirements.
 - **[Feature Specification](specifications/FEATURE_SPECIFICATION.md)** - Complete system capabilities and requirements
-- **[Notion Chat Feature Plan](specifications/NOTION_CHAT_FEATURE_PLAN.md)** - Natural language interface roadmap
 
 ### 📖 [User Guides](guides/)
 Step-by-step instructions for setup, configuration, and daily usage.
-- **[User Guide](guides/user_guide.md)** - Main user documentation
-- **[Setup Guides](guides/setup/)** - Initial configuration and device setup
-  - **[MCP Server Setup](guides/setup/mcp-server-setup.md)** - Model Context Protocol server for AI agents
 - **[Workflows](guides/workflows/)** - Daily usage patterns and automation
 - **[Integrations](guides/integrations/)** - Google Drive, Notion, and third-party services
 
