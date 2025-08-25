@@ -32,6 +32,47 @@ except ImportError:
 from ..utils.logging import VoiceLogger
 from ..utils.database import VoiceDatabase
 
+def get_claude_path() -> str:
+    """
+    Get the Claude CLI executable path.
+    
+    First checks CLAUDE_CLI_PATH environment variable, then tries common locations.
+    
+    Returns:
+        str: Path to Claude CLI executable
+        
+    Raises:
+        FileNotFoundError: If Claude CLI cannot be found
+    """
+    # Check environment variable first
+    if claude_path := os.getenv("CLAUDE_CLI_PATH"):
+        if Path(claude_path).exists():
+            return claude_path
+        # Log warning but continue to check other paths
+        print(f"Warning: CLAUDE_CLI_PATH set to '{claude_path}' but file doesn't exist")
+    
+    # Try common installation locations
+    paths_to_try = [
+        "/home/mike/.claude/local/claude",  # Current working location
+        "/home/mike/.nvm/versions/node/v24.2.0/bin/claude",  # Old NVM location
+        Path.home() / ".claude" / "local" / "claude",  # User's local installation
+        Path.home() / ".local" / "bin" / "claude",  # Alternative local bin
+    ]
+    
+    for path in paths_to_try:
+        path = Path(path)
+        if path.exists() and path.is_file():
+            return str(path)
+    
+    # If nothing found, raise informative error
+    raise FileNotFoundError(
+        "Claude CLI not found. Please either:\n"
+        "1. Set CLAUDE_CLI_PATH environment variable to the Claude executable path\n"
+        "2. Install Claude CLI to one of the standard locations:\n"
+        f"   - {paths_to_try[0]}\n"
+        f"   - {Path.home() / '.claude' / 'local' / 'claude'}"
+    )
+
 class ServiceStatus(Enum):
     """Service status levels"""
     HEALTHY = "healthy"

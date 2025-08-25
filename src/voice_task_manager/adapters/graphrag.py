@@ -5,8 +5,13 @@ import json
 import os
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+from dotenv import load_dotenv
 from ..utils.logging import VoiceLogger
+from ..utils.config import get_claude_path
 from .base import TaskAdapter, TaskData
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class GraphRAGTaskAdapter(TaskAdapter):
@@ -61,7 +66,7 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                 original_cwd = os.getcwd()
                 project_dir = "/home/mike/development/task-management"
                 
-                claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+                claude_path = get_claude_path()
                 cmd = [
                     claude_path, 
                     "-p", prompt,
@@ -76,12 +81,16 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                 
                 try:
                     os.chdir(project_dir)
+                    # Create environment without ANTHROPIC_API_KEY to use OAuth instead
+                    env = {**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
+                    env.pop('ANTHROPIC_API_KEY', None)  # Remove API key to force OAuth usage
+                    
                     result = subprocess.run(
                         cmd,
                         capture_output=True,
                         text=True,
                         timeout=None,  # No timeout - let Claude finish
-                        env={**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
+                        env=env
                     )
                 finally:
                     os.chdir(original_cwd)
@@ -99,15 +108,26 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
                     # First check if this is a claude JSON output format
                     try:
                         claude_response = json.loads(output)
-                        if isinstance(claude_response, dict) and 'result' in claude_response:
-                            # Extract the result field which contains the actual response
-                            result_content = claude_response['result']
-                            # Remove markdown code block if present
-                            if result_content.startswith('```json') and result_content.endswith('```'):
-                                result_content = result_content[7:-3].strip()
-                            response = json.loads(result_content)
-                            self.logger.success(f"Real MCP execution successful for {tool_name}")
-                            return response
+                        if isinstance(claude_response, dict):
+                            # Check if this is a successful Claude response with result
+                            if 'result' in claude_response and not claude_response.get('is_error', False):
+                                # Extract the result field which contains the actual response
+                                result_content = claude_response['result']
+                                # Remove markdown code block if present
+                                if result_content.startswith('```json') and result_content.endswith('```'):
+                                    result_content = result_content[7:-3].strip()
+                                try:
+                                    response = json.loads(result_content)
+                                    self.logger.success(f"Real MCP execution successful for {tool_name}")
+                                    return response
+                                except json.JSONDecodeError:
+                                    # Result might be plain text, not JSON
+                                    self.logger.warning(f"Could not parse result as JSON: {result_content[:100]}")
+                            elif 'usage' in claude_response:
+                                # This is just usage data, not the actual response
+                                # The actual response should be in the 'result' field
+                                self.logger.warning(f"Got usage data but no result for {tool_name}")
+                                self.logger.debug(f"Full response: {output[:500]}")
                     except (json.JSONDecodeError, KeyError):
                         pass
                     
@@ -447,7 +467,13 @@ Return ONLY the raw JSON result from the tool, with no additional text or format
             if "components" in response:
                 return True
             # For mock/error responses, check success field
-            return response.get("success", False)
+            if "success" in response:
+                return response.get("success", False)
+            # If we got usage data, it means the connection worked
+            if "usage" in response or "input_tokens" in response:
+                self.logger.info("GraphRAG connection successful (got usage data)")
+                return True
+            return False
         return False
     
     def _get_entity_context(self, query: str) -> Dict[str, Any]:

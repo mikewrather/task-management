@@ -11,9 +11,14 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from dotenv import load_dotenv
 
 from ..utils.logging import VoiceLogger
 from ..utils.notifications import VoiceNotificationSystem
+from ..utils.config import get_claude_path
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class SimpleNotifier:
@@ -153,7 +158,7 @@ class ClaudeSessionManager:
         """
         try:
             # Simple test command
-            claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+            claude_path = get_claude_path()
             cmd = [
                 claude_path,
                 "-p", "Return only: OK",
@@ -161,12 +166,16 @@ class ClaudeSessionManager:
                 "--output-format", "json"
             ]
             
+            # Create environment without ANTHROPIC_API_KEY to use OAuth instead
+            env = {**os.environ, "HOME": str(Path.home())}
+            env.pop('ANTHROPIC_API_KEY', None)  # Remove API key to force OAuth usage
+            
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
                 timeout=30,
-                env={**os.environ, "HOME": str(Path.home())}
+                env=env
             )
             
             if result.returncode == 0:

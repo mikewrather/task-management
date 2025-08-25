@@ -5,9 +5,14 @@ import json
 import os
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+from dotenv import load_dotenv
 from ..adapters.base import TaskData
 from ..adapters.graphrag import GraphRAGTaskAdapter
 from ..utils.logging import VoiceLogger
+from ..utils.config import get_claude_path
+
+# Load environment variables from .env file
+load_dotenv()
 
 
 class ClaudeVoiceProcessor:
@@ -312,8 +317,8 @@ REMEMBER: Your goal is to create a well-connected knowledge graph. Every task sh
         
         try:
             # Use Claude with project context and MCP access
-            # Use full path to claude command
-            claude_path = "/home/mike/.nvm/versions/node/v24.2.0/bin/claude"
+            # Get Claude path from configuration
+            claude_path = get_claude_path()
             
             # Add instruction to use MCP tools
             full_prompt = f"""{prompt}
@@ -339,12 +344,16 @@ Remember to:
             
             try:
                 os.chdir(project_dir)
+                # Create environment without ANTHROPIC_API_KEY to use OAuth instead
+                env = {**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
+                env.pop('ANTHROPIC_API_KEY', None)  # Remove API key to force OAuth usage
+                
                 result = subprocess.run(
                     cmd,
                     capture_output=True,
                     text=True,
                     timeout=None,  # No timeout - let Claude finish
-                    env={**os.environ, "PYTHONPATH": f"{project_dir}/src:{os.environ.get('PYTHONPATH', '')}"}
+                    env=env
                 )
             finally:
                 os.chdir(original_cwd)

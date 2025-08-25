@@ -1,6 +1,7 @@
 """Command Line Interface for Voice Task Manager"""
 
 import click
+from dotenv import load_dotenv
 from rich.console import Console
 from rich.table import Table
 from rich.text import Text
@@ -16,6 +17,9 @@ console = Console()
 @click.pass_context
 def main(ctx: click.Context, verbose: bool) -> None:
     """Voice Task Manager - Automated voice recording to Notion task conversion"""
+    # Load environment variables from .env file
+    load_dotenv()
+    
     ctx.ensure_object(dict)
     ctx.obj['verbose'] = verbose
     
