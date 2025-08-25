@@ -982,4 +982,58 @@ sudo systemctl status voice-processing
 - ✅ MCP servers (notion-task-management, agent-db) confirmed operational
 - ✅ No service restart required - changes apply on next 5-minute daemon cycle
 
+---
+
+## 2025-08-25: Claude Authentication Fix - OAuth Token vs API Key Conflict
+
+**Critical Issue Resolved**: System was failing to authenticate with Claude CLI despite valid OAuth token
+
+**Root Causes Identified**:
+1. **Wrong Claude CLI Path**: System using non-existent `/home/mike/.nvm/versions/node/v24.2.0/bin/claude`
+   - Actual location: `/home/mike/.claude/local/claude`
+2. **Environment Variable Conflict**: `ANTHROPIC_API_KEY` overriding OAuth token
+   - API key previously exported in shell config (later commented out)
+   - Claude CLI prioritizes API key over OAuth token
+3. **Missing dotenv Loading**: `.env` file not loaded in all modules
+
+**Solution Implemented**:
+1. **Centralized Path Configuration**: Created `get_claude_path()` in `utils/config.py`
+   - Checks `CLAUDE_CLI_PATH` env variable first
+   - Falls back to common installation locations
+   - Provides clear error message if not found
+
+2. **Environment Variable Management**: 
+   - Explicitly remove `ANTHROPIC_API_KEY` from subprocess environment
+   - Preserve other environment variables for proper operation
+   - Added to all Claude-executing modules (graphrag.py, claude_processor.py, session_manager.py)
+
+3. **dotenv Integration**:
+   - Added `load_dotenv()` to all relevant modules
+   - Ensures `CLAUDE_CODE_OAUTH_TOKEN` is available
+
+**Technical Implementation**:
+```python
+# Critical fix in subprocess calls
+env = {**os.environ}
+env.pop('ANTHROPIC_API_KEY', None)  # Remove API key to force OAuth usage
+result = subprocess.run(cmd, env=env, ...)
+```
+
+**Files Modified**:
+- `src/voice_task_manager/utils/config.py` - Added centralized path function
+- `src/voice_task_manager/adapters/graphrag.py` - Environment fixes
+- `src/voice_task_manager/processors/claude_processor.py` - Environment fixes
+- `src/voice_task_manager/services/session_manager.py` - Environment fixes
+- `src/voice_task_manager/cli.py` - Added dotenv loading
+- `.env` - Added Claude configuration variables
+
+**Documentation Created**:
+- `docs/claude-authentication-solution.md` - Comprehensive troubleshooting guide
+
+**Validation**:
+- ✅ OAuth token authentication working
+- ✅ MCP tool execution successful
+- ✅ Voice processing pipeline operational
+- ✅ Test scripts created for verification
+
 **System Reliability**: Both fixes address core stability issues that were causing suboptimal performance in the automated voice task management pipeline.
