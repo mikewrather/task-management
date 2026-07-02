@@ -3,6 +3,7 @@ Voice Processing Core V2 - Multi-platform support with intelligent categorizatio
 """
 
 import os
+import re
 import subprocess
 import sys
 from datetime import datetime
@@ -327,6 +328,11 @@ class VoiceProcessorV2:
             
             transcript_text = transcription_result['text']
             duration = transcription_result.get('duration', 0)
+            transcript_file_path = self._write_transcript_file(
+                voice_file,
+                transcript_text,
+                duration,
+            )
             
             # Step 4: Process with Claude if enabled
             tasks_to_create = []
@@ -368,18 +374,20 @@ class VoiceProcessorV2:
                 if created_tasks:
                     all_created_tasks.extend(created_tasks)
             
-            if not all_created_tasks:
+            if not all_created_tasks and not transcript_file_path:
                 voice_file.mark_failed("Failed to create any tasks in any adapter")
                 self.database.save_voice_file(voice_file)
                 return None
             
             # Step 6: Mark as completed and save
             # For multiple tasks, use a summary URL or first task URL
-            if len(tasks_to_create) > 1:
+            if all_created_tasks and len(tasks_to_create) > 1:
                 task_url = f"Created {len(tasks_to_create)} tasks"
-            else:
+            elif all_created_tasks:
                 # Try to get URL from first created task
-                task_url = all_created_tasks[0].get('task_url', 'Multiple adapters') if all_created_tasks else 'Multiple adapters'
+                task_url = all_created_tasks[0].get('task_url', 'Multiple adapters')
+            else:
+                task_url = f"Transcript written: {transcript_file_path}"
             
             voice_file.mark_completed(transcript_text, task_url, duration)
             self.database.save_voice_file(voice_file)
@@ -395,6 +403,7 @@ class VoiceProcessorV2:
                 'transcript': transcript_text,
                 'created_tasks': all_created_tasks,
                 'tasks_created': len(tasks_to_create),
+                'transcript_file': str(transcript_file_path) if transcript_file_path else None,
                 'task_summaries': [
                     {
                         'name': task.name,
@@ -434,6 +443,37 @@ class VoiceProcessorV2:
             source="voice"
         )
     
+    def _write_transcript_file(
+        self,
+        voice_file: VoiceFile,
+        transcript: str,
+        duration_seconds: Optional[float] = None,
+    ) -> Optional[Path]:
+        """Write raw transcript text to transcripts/ when enabled."""
+        if os.getenv('WRITE_TRANSCRIPT_FILE', 'true').lower() != 'true':
+            return None
+
+        processed_at = datetime.now()
+        transcript_dir = self.project_root / 'transcripts'
+        transcript_dir.mkdir(parents=True, exist_ok=True)
+
+        safe_file_id = re.sub(r'[^A-Za-z0-9_.-]+', '_', voice_file.file_id).strip('._')
+        transcript_date = (voice_file.discovered_at or processed_at).strftime('%Y-%m-%d')
+        transcript_path = transcript_dir / f"{transcript_date}-{safe_file_id}.md"
+
+        header_lines = [
+            '---',
+            f"source_file_id: {voice_file.file_id}",
+            f"discovered_at: {voice_file.discovered_at.isoformat() if voice_file.discovered_at else ''}",
+            f"processed_at: {processed_at.isoformat()}",
+            f"duration_seconds: {duration_seconds if duration_seconds is not None else ''}",
+            '---',
+            '',
+        ]
+        transcript_path.write_text('\n'.join(header_lines) + transcript + '\n', encoding='utf-8')
+        self.logger.info("Transcript file written", file_id=voice_file.file_id, path=str(transcript_path))
+        return transcript_path
+
     def _cleanup_processed_file(self, voice_file: VoiceFile) -> None:
         """Handle cleanup of processed voice files"""
         cleanup_success = self.drive_client.cleanup_processed_file(voice_file, cleanup_method='move')
