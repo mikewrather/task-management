@@ -1,0 +1,33 @@
+# Sourcerer proof_runner check profile for task-management.
+#
+# ⚠️ Scoped, not whole-repo, and that's deliberate. As of 2026-07-02 this
+# repo carries substantial pre-existing debt from the Notion-adapter
+# removal (PR #2, merged 2025-08-24, "pure GraphRAG architecture"):
+#   - `src/voice_task_manager/services/voice_daemon.py` imports the
+#     deleted `core.processor_v2` module (ModuleNotFoundError) -- the
+#     `vtm service start` daemon entry point does not currently import
+#     cleanly from a fresh checkout of `main`.
+#   - `ruff check src/` reports ~3,460 pre-existing violations.
+#   - The `tests/unit` suite has ~60+ pre-existing failures/collection
+#     errors (test_config.py, test_notifications.py, test_analyzer.py,
+#     test_cleanup.py, test_adapters.py, services/, and others) unrelated
+#     to any single change -- stale fixtures/mocks and modules that
+#     reference code deleted in the Notion-removal refactor.
+#
+# Gating proof_runner on the whole repo passing today would permanently
+# red-flag every future brew regardless of what it touches. Until a
+# dedicated test/lint remediation effort lands (tracked informally in
+# this project's Sourcerer card, `.sourcerer/project.md`), these checks
+# are scoped to (a) new/touched Python files for lint, and (b) a
+# known-good test target for tests. Widen these as remediation lands --
+# do not silently keep narrowing them.
+overrides:
+  build:
+    command: "uv run python -m compileall -q src/voice_task_manager"
+  lint:
+    command: >-
+      bash -c 'CHANGED=$(git diff --name-only origin/main...HEAD -- "*.py");
+      if [ -z "$CHANGED" ]; then echo "no changed python files"; else
+      uv run ruff check $CHANGED; fi'
+  tests:
+    command: "uv run --extra dev pytest tests/unit/test_transcript_files.py -q"
