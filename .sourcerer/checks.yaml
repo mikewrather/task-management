@@ -21,6 +21,7 @@
 # are scoped to (a) new/touched Python files for lint, and (b) a
 # known-good test target for tests. Widen these as remediation lands --
 # do not silently keep narrowing them.
+api_version: sourcerer.project-checks/v1
 overrides:
   build:
     command: "uv run python -m compileall -q src/voice_task_manager"
